@@ -28,7 +28,7 @@ def test_analyze_success(client, monkeypatch):
     monkeypatch.setattr(main.gemini_client, "analyze_speech", lambda b: fake)
     resp = client.post(
         "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"rawaudio"), "audio/webm")},
+        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
     )
     assert resp.status_code == 200
     assert resp.json()["scores"]["pace_pauses"] == 80
@@ -50,7 +50,7 @@ def test_analyze_handles_backend_error(client, monkeypatch):
     monkeypatch.setattr(main.gemini_client, "analyze_speech", boom)
     resp = client.post(
         "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"rawaudio"), "audio/webm")},
+        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
     )
     assert resp.status_code == 500
     assert "gemini down" in resp.json()["error"]

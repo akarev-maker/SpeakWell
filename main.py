@@ -9,7 +9,7 @@ import prompts
 
 app = FastAPI(title="SpeakWell")
 
-MIN_AUDIO_BYTES = 1  # reject empty recordings (0 bytes)
+MIN_AUDIO_BYTES = 1000  # reject trivially short/empty recordings
 
 
 @app.get("/api/prompt")
