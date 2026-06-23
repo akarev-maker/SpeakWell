@@ -35,14 +35,19 @@
 - [ ] **Step 1: Write requirements.txt**
 
 ```
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-google-genai==0.8.0
-python-dotenv==1.0.1
-python-multipart==0.0.20
-pytest==8.3.4
-httpx==0.28.1
+fastapi>=0.115
+uvicorn[standard]>=0.34
+google-genai>=1.0
+python-dotenv>=1.0
+python-multipart>=0.0.20
+pytest>=8.3
+httpx>=0.28
 ```
+
+Floors (not exact pins) so pip resolves wheels compatible with the installed
+Python (this environment runs Python 3.14). The `google-genai` 1.x API used in
+Task 3 (`genai.Client`, `client.models.generate_content`,
+`types.Part.from_bytes`, `types.GenerateContentConfig`) is stable across 1.x.
 
 - [ ] **Step 2: Write the failing test**
 
