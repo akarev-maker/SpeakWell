@@ -38,6 +38,16 @@ def test_parse_missing_score_key_raises():
         gemini_client.parse_response(json.dumps(bad))
 
 
+def test_parse_empty_text_raises():
+    with pytest.raises(RuntimeError, match="empty"):
+        gemini_client.parse_response("")
+
+
+def test_parse_none_text_raises():
+    with pytest.raises(RuntimeError, match="empty"):
+        gemini_client.parse_response(None)
+
+
 def test_analyze_speech_uses_client(monkeypatch):
     class FakeResp:
         text = json.dumps(VALID)

@@ -43,6 +43,8 @@ def _build_client() -> genai.Client:
 
 
 def parse_response(text: str) -> dict:
+    if not text:
+        raise RuntimeError("Gemini returned an empty response")
     cleaned = text.strip()
     if cleaned.startswith("```"):
         # strip leading ```json / ``` and trailing ```

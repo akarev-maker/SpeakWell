@@ -28,7 +28,7 @@ async def analyze(audio_file: UploadFile = File(..., alias="audio")):
     try:
         wav = audio.transcode_to_wav(raw)
         result = gemini_client.analyze_speech(wav)
-    except RuntimeError as exc:
+    except Exception as exc:  # covers ffmpeg/config RuntimeError and google-genai APIError
         return JSONResponse(status_code=500, content={"error": str(exc)})
     return result
 

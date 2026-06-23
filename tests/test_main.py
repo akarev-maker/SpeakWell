@@ -54,3 +54,16 @@ def test_analyze_handles_backend_error(client, monkeypatch):
     )
     assert resp.status_code == 500
     assert "gemini down" in resp.json()["error"]
+
+
+def test_analyze_handles_non_runtime_error(client, monkeypatch):
+    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
+    def boom(b):
+        raise ValueError("api boom")
+    monkeypatch.setattr(main.gemini_client, "analyze_speech", boom)
+    resp = client.post(
+        "/api/analyze",
+        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
+    )
+    assert resp.status_code == 500
+    assert "api boom" in resp.json()["error"]
