@@ -1,1 +1,38 @@
-<!doctype html><title>SpeakWell</title>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SpeakWell — Speech Coach</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>SpeakWell</h1>
+      <p class="tagline">Record yourself. Get coached on how you speak.</p>
+    </header>
+
+    <section class="prompt-bar">
+      <button id="promptBtn" class="secondary">Give me a prompt</button>
+      <p id="promptText" class="prompt-text" hidden></p>
+    </section>
+
+    <section class="recorder">
+      <button id="recordBtn" class="record">● Record</button>
+      <span id="timer" class="timer">0:00</span>
+    </section>
+
+    <p id="status" class="status" role="status"></p>
+
+    <section id="results" class="results" hidden>
+      <div class="scores" id="scores"></div>
+      <h2>Transcript</h2>
+      <p id="transcript" class="transcript"></p>
+      <h2>Coaching feedback</h2>
+      <p id="feedback" class="feedback"></p>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
