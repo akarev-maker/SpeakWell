@@ -301,6 +301,21 @@ button.primary:hover { background: var(--accent-dark); }
   overflow: hidden;
 }
 .score-bar > span { display: block; height: 100%; border-radius: 999px; }
+.score-why {
+  margin-top: 0.6rem;
+  background: transparent;
+  padding: 0;
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.score-reason {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  line-height: 1.5;
+}
 
 .transcript,
 .feedback {

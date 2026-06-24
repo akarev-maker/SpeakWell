@@ -365,14 +365,29 @@ function colorFor(v) {
 
 function render(data) {
   scoresEl.innerHTML = "";
+  const reasons = data.score_reasons || {};
   for (const [key, label] of Object.entries(SCORE_LABELS)) {
-    const v = data.scores[key];
+    const v = Number(data.scores[key]);
+    const reason = reasons[key] || "";
     const card = document.createElement("div");
     card.className = "score-card";
     card.innerHTML =
       `<div class="label">${label}</div>` +
       `<div class="value">${v}</div>` +
-      `<div class="score-bar"><span style="width:${v}%;background:${colorFor(v)}"></span></div>`;
+      `<div class="score-bar"><span style="width:${v}%;background:${colorFor(v)}"></span></div>` +
+      (reason ? `<button class="score-why" type="button">Why this score?</button>` : "");
+    if (reason) {
+      const r = document.createElement("div");
+      r.className = "score-reason";
+      r.hidden = true;
+      r.textContent = reason;
+      card.appendChild(r);
+      const btn = card.querySelector(".score-why");
+      btn.addEventListener("click", () => {
+        r.hidden = !r.hidden;
+        btn.textContent = r.hidden ? "Why this score?" : "Hide";
+      });
+    }
     scoresEl.appendChild(card);
   }
   if (data.answer_critique && data.model_answer) {

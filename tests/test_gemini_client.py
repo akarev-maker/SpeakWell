@@ -12,7 +12,32 @@ VALID = {
     "filler_words": ["um"],
     "feedback": "Good clarity. You said 'um' a few times.",
     "tips": ["Pause instead of saying 'um'.", "Slow down the opening sentence."],
+    "score_reasons": {
+        "filler_words": "You said 'um' twice in a short clip.",
+        "pace_pauses": "Steady pace, natural pauses.",
+        "clarity_structure": "Clear main point, decent structure.",
+        "confidence_tone": "Mostly steady, a little hesitant.",
+    },
 }
+
+
+def test_parse_includes_score_reasons():
+    out = gemini_client.parse_response(json.dumps(VALID))
+    assert out["score_reasons"]["filler_words"].startswith("You said 'um'")
+
+
+def test_parse_missing_score_reasons_raises():
+    bad = json.loads(json.dumps(VALID))
+    del bad["score_reasons"]
+    with pytest.raises(RuntimeError, match="score_reasons"):
+        gemini_client.parse_response(json.dumps(bad))
+
+
+def test_parse_missing_one_score_reason_raises():
+    bad = json.loads(json.dumps(VALID))
+    del bad["score_reasons"]["pace_pauses"]
+    with pytest.raises(RuntimeError, match="score_reasons"):
+        gemini_client.parse_response(json.dumps(bad))
 
 
 VALID_INTERVIEW = {

@@ -13,11 +13,18 @@ INSTRUCTION = (
     '{"scores": {"filler_words": int, "pace_pauses": int, '
     '"clarity_structure": int, "confidence_tone": int}, '
     '"transcript": string, "filler_words": [string], "feedback": string, '
-    '"tips": [string]}\n'
+    '"tips": [string], "score_reasons": {"filler_words": string, '
+    '"pace_pauses": string, "clarity_structure": string, '
+    '"confidence_tone": string}}\n'
     "Each score is an integer from 0 to 100 (higher is better). Use the FULL "
     "range and be precise and discriminating: do NOT default to round numbers "
     "like 70, 75, or 80 — if the delivery is an 83, score it 83, not 85. "
     "Avoid clustering scores on multiples of 5 or 10. "
+    "'score_reasons' gives a ONE-sentence justification for each of the four "
+    "scores, grounded in concrete evidence from THIS recording (e.g. cite the "
+    "actual filler count and clip length, the approximate words-per-minute, or a "
+    "specific moment). If a score is harsh, the reason must defend it with "
+    "evidence; do not penalize fillers you cannot point to. "
     "'transcript' is a faithful transcript of the speech. "
     "'filler_words' lists the distinct filler words actually used "
     "(e.g. um, uh, like, you know); empty list if none. "
@@ -42,8 +49,15 @@ RESPONSE_SCHEMA = {
         "filler_words": {"type": "array", "items": {"type": "string"}},
         "feedback": {"type": "string"},
         "tips": {"type": "array", "items": {"type": "string"}},
+        "score_reasons": {
+            "type": "object",
+            "properties": {k: {"type": "string"} for k in SCORE_KEYS},
+            "required": SCORE_KEYS,
+        },
     },
-    "required": ["scores", "transcript", "filler_words", "feedback", "tips"],
+    "required": [
+        "scores", "transcript", "filler_words", "feedback", "tips", "score_reasons",
+    ],
 }
 
 INTERVIEW_FIELDS = ["answer_critique", "model_answer"]
@@ -85,11 +99,17 @@ def build_interview_addendum(question: str) -> str:
     """Extra instruction appended when analyzing a mock-interview answer."""
     return (
         "\n\nThis is a MOCK INTERVIEW. The speaker is answering this interview "
-        f'question: "{question.strip()}". In addition to the fields above, also '
-        'return "answer_critique" (2-3 sentences assessing how well the spoken '
-        "answer addresses the question — relevance, specific examples, structure, "
-        'and what was missing) and "model_answer" (a concise, stronger example '
-        "answer to the same question that the speaker can learn from)."
+        f'question: "{question.strip()}". First decide what THIS question is '
+        "actually assessing, and judge the answer on that basis: a motivation or "
+        "interest question (e.g. 'why are you interested in…') is about genuine, "
+        "specific motivation, fit, and a compelling personal reason — NOT "
+        "technical depth; a behavioral question wants a concrete example (ideally "
+        "STAR); a technical question wants accuracy and depth. Do NOT demand "
+        "technical detail or examples where the question does not call for them. "
+        'In addition to the fields above, return "answer_critique" (2-3 sentences '
+        "judging the answer against what the question is really asking, and what "
+        'would make it stronger) and "model_answer" (a concise, stronger example '
+        "answer to the same question)."
     )
 
 
@@ -262,6 +282,11 @@ def parse_response(text: str, require_interview: bool = False) -> dict:
     for field in required:
         if field not in data:
             raise RuntimeError(f"Gemini response missing '{field}'")
+    if not isinstance(data.get("score_reasons"), dict):
+        raise RuntimeError("Gemini response missing 'score_reasons' object")
+    for key in SCORE_KEYS:
+        if key not in data["score_reasons"]:
+            raise RuntimeError(f"Gemini response missing score_reasons.{key}")
     return data
 
 
