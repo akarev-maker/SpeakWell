@@ -63,3 +63,37 @@ def test_analyze_speech_uses_client(monkeypatch):
     monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
     out = gemini_client.analyze_speech(b"RIFFWAVE")
     assert out["scores"]["filler_words"] == 72
+
+
+def test_build_instruction_without_prompt_is_base():
+    assert gemini_client.build_instruction(None) == gemini_client.INSTRUCTION
+    assert gemini_client.build_instruction("") == gemini_client.INSTRUCTION
+
+
+def test_build_instruction_with_prompt_includes_it():
+    text = gemini_client.build_instruction("Describe your ideal weekend.")
+    assert "Describe your ideal weekend." in text
+    # base instruction is preserved
+    assert "You are SpeakWell" in text
+    # the model is told to consider how well the prompt was addressed
+    assert "address" in text.lower()
+
+
+def test_analyze_speech_passes_prompt_into_contents(monkeypatch):
+    captured = {}
+
+    class FakeResp:
+        text = json.dumps(VALID)
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            captured["contents"] = kwargs["contents"]
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    gemini_client.analyze_speech(b"RIFFWAVE", prompt="Pitch your favorite app.")
+    instruction_text = captured["contents"][-1]
+    assert "Pitch your favorite app." in instruction_text

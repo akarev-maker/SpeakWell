@@ -25,13 +25,59 @@ def test_analyze_success(client, monkeypatch):
                    "clarity_structure": 75, "confidence_tone": 78},
         "transcript": "hello world", "filler_words": [], "feedback": "Nice.",
     }
-    monkeypatch.setattr(main.gemini_client, "analyze_speech", lambda b: fake)
+    monkeypatch.setattr(main.gemini_client, "analyze_speech", lambda b, prompt=None: fake)
     resp = client.post(
         "/api/analyze",
         files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
     )
     assert resp.status_code == 200
     assert resp.json()["scores"]["pace_pauses"] == 80
+
+
+def test_analyze_forwards_prompt(client, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
+    fake = {
+        "scores": {"filler_words": 70, "pace_pauses": 80,
+                   "clarity_structure": 75, "confidence_tone": 78},
+        "transcript": "hello", "filler_words": [], "feedback": "Nice.",
+    }
+
+    def fake_analyze(b, prompt=None):
+        captured["prompt"] = prompt
+        return fake
+
+    monkeypatch.setattr(main.gemini_client, "analyze_speech", fake_analyze)
+    resp = client.post(
+        "/api/analyze",
+        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
+        data={"prompt": "Describe your ideal weekend."},
+    )
+    assert resp.status_code == 200
+    assert captured["prompt"] == "Describe your ideal weekend."
+
+
+def test_analyze_blank_prompt_becomes_none(client, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
+    fake = {
+        "scores": {"filler_words": 70, "pace_pauses": 80,
+                   "clarity_structure": 75, "confidence_tone": 78},
+        "transcript": "hello", "filler_words": [], "feedback": "Nice.",
+    }
+
+    def fake_analyze(b, prompt=None):
+        captured["prompt"] = prompt
+        return fake
+
+    monkeypatch.setattr(main.gemini_client, "analyze_speech", fake_analyze)
+    resp = client.post(
+        "/api/analyze",
+        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
+        data={"prompt": "   "},
+    )
+    assert resp.status_code == 200
+    assert captured["prompt"] is None
 
 
 def test_analyze_empty_audio_rejected(client):
@@ -45,7 +91,7 @@ def test_analyze_empty_audio_rejected(client):
 
 def test_analyze_handles_backend_error(client, monkeypatch):
     monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    def boom(b):
+    def boom(b, prompt=None):
         raise RuntimeError("gemini down")
     monkeypatch.setattr(main.gemini_client, "analyze_speech", boom)
     resp = client.post(
@@ -58,7 +104,7 @@ def test_analyze_handles_backend_error(client, monkeypatch):
 
 def test_analyze_handles_non_runtime_error(client, monkeypatch):
     monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    def boom(b):
+    def boom(b, prompt=None):
         raise ValueError("api boom")
     monkeypatch.setattr(main.gemini_client, "analyze_speech", boom)
     resp = client.post(

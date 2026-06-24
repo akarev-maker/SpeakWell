@@ -38,6 +38,20 @@ RESPONSE_SCHEMA = {
 }
 
 
+def build_instruction(prompt: str | None) -> str:
+    """Return the coaching instruction, optionally tailored to a user prompt."""
+    if not prompt or not prompt.strip():
+        return INSTRUCTION
+    return (
+        INSTRUCTION
+        + "\n\nThe speaker was asked to respond to this prompt: "
+        + f'"{prompt.strip()}". '
+        "Take into account how well they addressed the prompt — staying on "
+        "topic and answering what was asked — in the 'clarity_structure' score "
+        "and mention it in the feedback."
+    )
+
+
 def _build_client() -> genai.Client:
     return genai.Client(api_key=config.get_api_key())
 
@@ -69,13 +83,13 @@ def parse_response(text: str) -> dict:
     return data
 
 
-def analyze_speech(wav_bytes: bytes) -> dict:
+def analyze_speech(wav_bytes: bytes, prompt: str | None = None) -> dict:
     client = _build_client()
     response = client.models.generate_content(
         model=config.GEMINI_MODEL,
         contents=[
             types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
-            INSTRUCTION,
+            build_instruction(prompt),
         ],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

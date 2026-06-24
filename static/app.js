@@ -1,6 +1,6 @@
 const recordBtn = document.getElementById("recordBtn");
 const promptBtn = document.getElementById("promptBtn");
-const promptText = document.getElementById("promptText");
+const promptInput = document.getElementById("promptInput");
 const timerEl = document.getElementById("timer");
 const statusEl = document.getElementById("status");
 const results = document.getElementById("results");
@@ -34,9 +34,9 @@ function fmt(t) {
 promptBtn.addEventListener("click", async () => {
   try {
     const r = await fetch("/api/prompt");
+    if (!r.ok) throw new Error();
     const data = await r.json();
-    promptText.textContent = data.prompt;
-    promptText.hidden = false;
+    promptInput.value = data.prompt;
   } catch {
     setStatus("Could not load a prompt.", true);
   }
@@ -85,6 +85,7 @@ async function analyze(blob) {
   recordBtn.disabled = true;
   const fd = new FormData();
   fd.append("audio", blob, "recording.webm");
+  fd.append("prompt", promptInput.value.trim());
   try {
     const r = await fetch("/api/analyze", { method: "POST", body: fd });
     const data = await r.json();
