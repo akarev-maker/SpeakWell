@@ -13,5 +13,22 @@ def test_get_api_key_missing_raises(monkeypatch):
         config.get_api_key()
 
 
-def test_model_constant():
-    assert config.GEMINI_MODEL == "gemini-2.5-flash"
+def test_model_default(monkeypatch):
+    import importlib
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    try:
+        importlib.reload(config)
+        assert config.GEMINI_MODEL == "gemini-3.1-flash-lite"
+    finally:
+        importlib.reload(config)
+
+
+def test_model_env_override(monkeypatch):
+    import importlib
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-flash")
+    try:
+        importlib.reload(config)
+        assert config.GEMINI_MODEL == "gemini-2.5-flash"
+    finally:
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+        importlib.reload(config)

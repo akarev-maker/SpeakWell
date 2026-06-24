@@ -1,5 +1,6 @@
 import json
 import pytest
+import config
 import gemini_client
 
 VALID = {
@@ -70,7 +71,7 @@ def test_analyze_speech_uses_client(monkeypatch):
 
     class FakeModels:
         def generate_content(self, **kwargs):
-            assert kwargs["model"] == "gemini-2.5-flash"
+            assert kwargs["model"] == config.GEMINI_MODEL
             return FakeResp()
 
     class FakeClient:

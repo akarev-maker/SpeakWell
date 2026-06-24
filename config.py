@@ -3,8 +3,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# gemini-2.0-flash was shut down 2026-06-01; use the current stable Flash model.
-GEMINI_MODEL = "gemini-2.5-flash"
+# Model is configurable via GEMINI_MODEL in .env. Default: gemini-3.1-flash-lite
+# (audio-capable, generous free-tier RPD). gemini-2.0-flash was shut down 2026-06-01.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "").strip() or "gemini-3.1-flash-lite"
 
 
 def get_api_key() -> str:
