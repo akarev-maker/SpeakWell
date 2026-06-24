@@ -11,11 +11,29 @@ def client():
     return TestClient(main.app)
 
 
-def test_prompt_endpoint(client):
-    resp = client.get("/api/prompt")
+def test_prompt_endpoint_no_context_is_random(client):
+    resp = client.post("/api/prompt")
     assert resp.status_code == 200
     assert isinstance(resp.json()["prompt"], str)
     assert resp.json()["prompt"]
+
+
+def test_prompt_tailored_to_context(client, monkeypatch):
+    monkeypatch.setattr(
+        main.gemini_client, "generate_prompt", lambda c: f"Tailored for: {c}"
+    )
+    resp = client.post("/api/prompt", data={"context": "Sales pitching"})
+    assert resp.status_code == 200
+    assert resp.json()["prompt"] == "Tailored for: Sales pitching"
+
+
+def test_prompt_falls_back_when_generation_fails(client, monkeypatch):
+    def boom(c):
+        raise RuntimeError("gemini down")
+    monkeypatch.setattr(main.gemini_client, "generate_prompt", boom)
+    resp = client.post("/api/prompt", data={"context": "Sales pitching"})
+    assert resp.status_code == 200
+    assert resp.json()["prompt"]  # a fallback random prompt
 
 
 def test_analyze_success(client, monkeypatch):

@@ -13,8 +13,14 @@ MIN_AUDIO_BYTES = 1000  # reject trivially short/empty recordings
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # 25 MB cap to bound memory use
 
 
-@app.get("/api/prompt")
-def get_prompt():
+@app.post("/api/prompt")
+def get_prompt(context: str = Form("")):
+    context = context.strip()
+    if context:
+        try:
+            return {"prompt": gemini_client.generate_prompt(context)}
+        except Exception:
+            pass  # fall back to a generic prompt below
     return {"prompt": prompts.random_prompt()}
 
 

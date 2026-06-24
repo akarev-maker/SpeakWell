@@ -49,13 +49,20 @@ function buildContext() {
 }
 
 promptBtn.addEventListener("click", async () => {
+  promptBtn.disabled = true;
+  setStatus("Finding a prompt for you…");
   try {
-    const r = await fetch("/api/prompt");
+    const fd = new FormData();
+    fd.append("context", buildContext());
+    const r = await fetch("/api/prompt", { method: "POST", body: fd });
     if (!r.ok) throw new Error();
     const data = await r.json();
     promptInput.value = data.prompt;
+    setStatus("");
   } catch {
     setStatus("Could not load a prompt.", true);
+  } finally {
+    promptBtn.disabled = false;
   }
 });
 

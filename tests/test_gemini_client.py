@@ -115,6 +115,39 @@ def test_analyze_speech_passes_prompt_into_contents(monkeypatch):
     assert "Pitch your favorite app." in instruction_text
 
 
+def test_generate_prompt_embeds_context_and_strips_quotes(monkeypatch):
+    class FakeResp:
+        text = '"Tell me about a deal you closed."'
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            assert "Sales pitching" in kwargs["contents"][0]
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    out = gemini_client.generate_prompt("Sales pitching")
+    assert out == "Tell me about a deal you closed."
+
+
+def test_generate_prompt_empty_raises(monkeypatch):
+    class FakeResp:
+        text = "   "
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    with pytest.raises(RuntimeError, match="empty"):
+        gemini_client.generate_prompt("Sales")
+
+
 def test_build_instruction_with_context_includes_it():
     text = gemini_client.build_instruction(
         None, context="Junior developer preparing for interviews"

@@ -69,8 +69,29 @@ def build_instruction(prompt: str | None, context: str | None = None) -> str:
     return text
 
 
+PROMPT_INSTRUCTION = (
+    "Generate ONE short speaking-practice prompt (a single sentence or question) "
+    'for someone rehearsing their spoken delivery. Their goal/context is: "{context}". '
+    "Make the prompt directly relevant to that context so they can practice for it. "
+    "Return ONLY the prompt text — no quotes, no preamble, no numbering."
+)
+
+
 def _build_client() -> genai.Client:
     return genai.Client(api_key=config.get_api_key())
+
+
+def generate_prompt(context: str) -> str:
+    """Generate a single speaking prompt tailored to the user's context."""
+    client = _build_client()
+    response = client.models.generate_content(
+        model=config.GEMINI_MODEL,
+        contents=[PROMPT_INSTRUCTION.format(context=context.strip())],
+    )
+    text = (response.text or "").strip().strip('"').strip()
+    if not text:
+        raise RuntimeError("Gemini returned an empty prompt")
+    return text
 
 
 def parse_response(text: str) -> dict:
