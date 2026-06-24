@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 import audio
 import gemini_client
 import prompts
+import storage
 
 app = FastAPI(title="SpeakWell")
 
@@ -90,7 +91,20 @@ async def analyze(
         )
     except Exception as exc:  # covers ffmpeg/config RuntimeError and google-genai APIError
         return JSONResponse(status_code=500, content={"error": str(exc)})
+    try:
+        storage.save_session(
+            mode="interview" if is_interview else "practice",
+            label=(question or speech_prompt or "")[:120],
+            scores=result.get("scores", {}),
+        )
+    except Exception:
+        pass  # history is best-effort; never break analysis
     return result
+
+
+@app.get("/api/progress")
+def progress():
+    return {"sessions": storage.recent_sessions(50)}
 
 
 @app.get("/")

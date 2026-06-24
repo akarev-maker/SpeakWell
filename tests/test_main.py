@@ -5,6 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
+import storage
+
+
+@pytest.fixture(autouse=True)
+def temp_db(tmp_path, monkeypatch):
+    # Point the history DB at a throwaway file so tests never touch speakwell.db.
+    monkeypatch.setattr(storage, "DB_PATH", str(tmp_path / "test.db"))
 
 
 @pytest.fixture
@@ -245,6 +252,35 @@ def test_analyze_rejects_oversized_audio(client, monkeypatch):
     )
     assert resp.status_code == 413
     assert "error" in resp.json()
+
+
+def test_analyze_saves_session(client, monkeypatch):
+    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
+    fake = {
+        "scores": {"filler_words": 70, "pace_pauses": 80,
+                   "clarity_structure": 75, "confidence_tone": 78},
+        "transcript": "hi", "filler_words": [], "feedback": "ok", "tips": ["x"],
+    }
+    monkeypatch.setattr(
+        main.gemini_client, "analyze_speech",
+        lambda b, prompt=None, context=None, question=None: fake,
+    )
+    client.post(
+        "/api/analyze",
+        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
+        data={"prompt": "Tell me about yourself"},
+    )
+    rows = storage.recent_sessions(10)
+    assert len(rows) == 1
+    assert rows[0]["mode"] == "practice"
+    assert rows[0]["filler_words"] == 70
+    assert rows[0]["label"] == "Tell me about yourself"
+
+
+def test_progress_endpoint(client):
+    resp = client.get("/api/progress")
+    assert resp.status_code == 200
+    assert resp.json()["sessions"] == []
 
 
 def test_analyze_empty_audio_rejected(client):

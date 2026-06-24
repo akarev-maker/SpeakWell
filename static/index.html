@@ -11,8 +11,10 @@
     <header>
       <h1>SpeakWell</h1>
       <p class="tagline">Speak. Reflect. Improve.</p>
+      <button id="progressLink" class="progress-link" type="button">📈 Progress</button>
     </header>
 
+    <div id="appMain">
     <div class="mode-switch" id="modeSwitch" role="tablist" aria-label="Mode">
       <span class="mode-thumb" aria-hidden="true"></span>
       <button type="button" class="mode-option is-active" data-mode="practice" role="tab" aria-selected="true">Practice</button>
@@ -131,6 +133,9 @@
       </div>
       <button id="restartInterviewBtn" class="secondary">Start over</button>
     </section>
+    </div>
+
+    <section id="progressView" hidden></section>
   </main>
   <script src="/static/app.js"></script>
 </body>

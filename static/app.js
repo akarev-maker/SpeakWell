@@ -15,6 +15,9 @@ const summaryLevel = document.getElementById("summaryLevel");
 const summaryText = document.getElementById("summaryText");
 const summaryStrengths = document.getElementById("summaryStrengths");
 const summaryImprovements = document.getElementById("summaryImprovements");
+const appMain = document.getElementById("appMain");
+const progressView = document.getElementById("progressView");
+const progressLink = document.getElementById("progressLink");
 const promptBtn = document.getElementById("promptBtn");
 const promptInput = document.getElementById("promptInput");
 const contextSelect = document.getElementById("contextSelect");
@@ -428,6 +431,95 @@ function highlight(transcript, fillers) {
   }
   return html;
 }
+
+// ----- Progress view -----
+const PROGRESS_DIMS = [
+  ["filler_words", "Filler words"],
+  ["pace_pauses", "Pace & pauses"],
+  ["clarity_structure", "Clarity & structure"],
+  ["confidence_tone", "Confidence & tone"],
+];
+
+function sparkline(values) {
+  const w = 248, h = 44, pad = 5;
+  if (!values.length) return "";
+  if (values.length === 1) {
+    const y = pad + (h - pad * 2) * (1 - values[0] / 100);
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
+      `<circle cx="${w / 2}" cy="${y.toFixed(1)}" r="3" fill="var(--accent)"/></svg>`;
+  }
+  const stepX = (w - pad * 2) / (values.length - 1);
+  const pts = values.map((v, i) => {
+    const x = pad + i * stepX;
+    const c = Math.max(0, Math.min(100, v));
+    const y = pad + (h - pad * 2) * (1 - c / 100);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
+    `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" ` +
+    `stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+function renderProgress(sessions) {
+  if (!sessions.length) {
+    progressView.innerHTML =
+      `<div class="progress-head"><button id="backBtn" class="secondary">← Back</button></div>` +
+      `<p class="empty-state">No sessions yet — record something to start tracking your progress.</p>`;
+    document.getElementById("backBtn").addEventListener("click", hideProgress);
+    return;
+  }
+  const chrono = sessions.slice().reverse(); // oldest -> newest
+  let cards = "";
+  for (const [key, label] of PROGRESS_DIMS) {
+    const vals = chrono.map((s) => s[key]).filter((v) => v != null);
+    if (!vals.length) continue;
+    const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    const first = vals[0], last = vals[vals.length - 1];
+    const dir = last > first ? "up" : last < first ? "down" : "flat";
+    const arrow = dir === "up" ? "▲" : dir === "down" ? "▼" : "–";
+    cards +=
+      `<div class="trend-card"><div class="label">${label}</div>` +
+      `<div class="trend-row"><span class="trend-avg">avg ${avg}</span>` +
+      `<span class="trend-arrow ${dir}">${arrow} ${last}</span></div>` +
+      sparkline(vals) + `</div>`;
+  }
+  let hist = "";
+  for (const s of sessions) {
+    const d = new Date(s.created_at);
+    const when = isNaN(d.getTime()) ? "" :
+      `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    hist +=
+      `<li><span class="h-when">${when}</span>` +
+      `<span class="h-mode ${s.mode}">${s.mode}</span>` +
+      `<span class="h-label">${escapeHtml(s.label || "")}</span>` +
+      `<span class="h-scores">${s.filler_words} · ${s.pace_pauses} · ${s.clarity_structure} · ${s.confidence_tone}</span></li>`;
+  }
+  progressView.innerHTML =
+    `<div class="progress-head"><button id="backBtn" class="secondary">← Back</button>` +
+    `<h2>Your progress</h2>` +
+    `<p class="muted-line">${sessions.length} session${sessions.length > 1 ? "s" : ""} recorded · oldest → newest</p></div>` +
+    `<div class="trend-grid">${cards}</div>` +
+    `<h2>History</h2><ul class="history">${hist}</ul>`;
+  document.getElementById("backBtn").addEventListener("click", hideProgress);
+}
+
+async function showProgress() {
+  appMain.hidden = true;
+  progressView.hidden = false;
+  progressView.innerHTML = `<p class="muted-line">Loading…</p>`;
+  try {
+    const r = await fetch("/api/progress");
+    const data = await r.json();
+    renderProgress(data.sessions || []);
+  } catch {
+    progressView.innerHTML = `<p class="status error">Could not load your progress.</p>`;
+  }
+}
+function hideProgress() {
+  progressView.hidden = true;
+  appMain.hidden = false;
+}
+progressLink.addEventListener("click", showProgress);
 
 // Set initial screen visibility.
 layout();
