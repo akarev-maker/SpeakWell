@@ -20,6 +20,9 @@
 
 * { box-sizing: border-box; }
 
+/* The hidden attribute must win over component display rules (e.g. flex/grid). */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: var(--sans);
