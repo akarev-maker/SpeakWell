@@ -4,3 +4,6 @@ __pycache__/
 .venv/
 venv/
 .superpowers/
+
+# local progress database
+speakwell.db
