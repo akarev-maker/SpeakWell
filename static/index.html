@@ -13,8 +13,11 @@
       <p class="tagline">Speak. Reflect. Improve.</p>
     </header>
 
-    <details class="customize">
-      <summary><span class="chev">▸</span> Set a goal or practice mode</summary>
+    <div class="mode-switch" id="modeSwitch" role="tablist" aria-label="Mode">
+      <span class="mode-thumb" aria-hidden="true"></span>
+      <button type="button" class="mode-option is-active" data-mode="practice" role="tab" aria-selected="true">Practice</button>
+      <button type="button" class="mode-option" data-mode="interview" role="tab" aria-selected="false">Mock interview</button>
+    </div>
 
     <section class="context-bar">
       <label for="contextSelect" class="prompt-label">Who are you / what's your goal? (optional)</label>
@@ -34,18 +37,12 @@
         placeholder="Add specifics (optional), e.g. ‘I get nervous and talk too fast in interviews.’"></textarea>
     </section>
 
-    <label class="interview-toggle">
-      <input type="checkbox" id="interviewToggle" />
-      <span>🎤 Mock interview mode</span>
-    </label>
-
     <section class="prompt-bar">
       <label for="promptInput" class="prompt-label" id="promptLabel">Your speaking prompt (optional)</label>
       <textarea id="promptInput" class="prompt-input" rows="2"
         placeholder="Type your own prompt to speak about, or click ‘Give me a prompt’…"></textarea>
       <button id="promptBtn" class="secondary">Give me a prompt</button>
     </section>
-    </details>
 
     <section class="recorder">
       <button id="recordBtn" class="record">● Record</button>

@@ -67,37 +67,44 @@ h2 {
   gap: 0.55rem;
   align-items: stretch;
 }
-.customize { margin: 1.75rem 0 0; }
-.customize > summary {
-  list-style: none;
-  cursor: pointer;
+/* Mode switch (Practice / Mock interview) */
+.mode-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #e2eade;
+  border-radius: 999px;
+  padding: 4px;
+  margin: 2rem auto 0;
+  max-width: 340px;
+}
+.mode-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  background: var(--panel);
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(47, 58, 49, 0.14);
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.mode-switch.interview .mode-thumb { transform: translateX(100%); }
+.mode-option {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.95rem;
   color: var(--muted);
-  font-size: 0.95rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.3rem 0;
-  user-select: none;
+  transition: color 0.2s ease, transform 0.08s ease;
 }
-.customize > summary::-webkit-details-marker { display: none; }
-.customize > summary:hover { color: var(--accent-dark); }
-.customize .chev { display: inline-block; transition: transform 0.15s ease; }
-.customize[open] > summary .chev { transform: rotate(90deg); }
+.mode-option.is-active { color: var(--text); font-weight: 600; }
+.mode-option:active { transform: scale(0.95); }
 
-.context-bar { margin: 1rem 0 0; }
+.context-bar { margin: 1.6rem 0 0; }
 .prompt-bar { margin: 0.9rem 0 0; }
-
-.interview-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin: 1.4rem 0 0;
-  font-size: 0.95rem;
-  color: var(--text);
-  cursor: pointer;
-  user-select: none;
-}
-.interview-toggle input { width: 1.05rem; height: 1.05rem; accent-color: var(--accent); cursor: pointer; }
 
 .interview-card {
   background: #fbfdfa;

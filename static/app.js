@@ -4,7 +4,8 @@ const promptInput = document.getElementById("promptInput");
 const contextSelect = document.getElementById("contextSelect");
 const contextDetail = document.getElementById("contextDetail");
 const tipsEl = document.getElementById("tips");
-const interviewToggle = document.getElementById("interviewToggle");
+const modeSwitch = document.getElementById("modeSwitch");
+const modeOptions = document.querySelectorAll(".mode-option");
 const promptLabel = document.getElementById("promptLabel");
 const interviewCard = document.getElementById("interviewCard");
 const answerCritique = document.getElementById("answerCritique");
@@ -53,18 +54,33 @@ function buildContext() {
   return parts.join(". ");
 }
 
+let mode = "practice";
+const isInterview = () => mode === "interview";
+
 function updateInterviewUi() {
-  const on = interviewToggle.checked;
+  const on = isInterview();
   promptBtn.textContent = on ? "Give me an interview question" : "Give me a prompt";
   promptLabel.textContent = on ? "Interview question" : "Your speaking prompt (optional)";
   promptInput.placeholder = on
     ? "Click ‘Give me an interview question’, or type your own…"
     : "Type your own prompt to speak about, or click ‘Give me a prompt’…";
 }
-interviewToggle.addEventListener("change", updateInterviewUi);
+
+function setMode(next) {
+  if (next === mode) return;
+  mode = next;
+  modeOptions.forEach((b) => {
+    const active = b.dataset.mode === mode;
+    b.classList.toggle("is-active", active);
+    b.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  modeSwitch.classList.toggle("interview", isInterview());
+  updateInterviewUi();
+}
+modeOptions.forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 
 promptBtn.addEventListener("click", async () => {
-  const on = interviewToggle.checked;
+  const on = isInterview();
   promptBtn.disabled = true;
   setStatus(on ? "Finding an interview question…" : "Finding a prompt for you…");
   try {
@@ -131,7 +147,7 @@ async function analyze(blob) {
   fd.append("audio", blob, "recording.webm");
   fd.append("prompt", promptInput.value.trim());
   fd.append("context", buildContext());
-  if (interviewToggle.checked) fd.append("interview", "1");
+  if (isInterview()) fd.append("interview", "1");
   try {
     const r = await fetch("/api/analyze", { method: "POST", body: fd });
     const data = await r.json();
