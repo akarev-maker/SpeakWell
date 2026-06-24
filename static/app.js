@@ -3,6 +3,10 @@ const promptBtn = document.getElementById("promptBtn");
 const promptInput = document.getElementById("promptInput");
 const contextSelect = document.getElementById("contextSelect");
 const contextDetail = document.getElementById("contextDetail");
+const contextBar = document.getElementById("contextBar");
+const interviewContext = document.getElementById("interviewContext");
+const roleSelect = document.getElementById("roleSelect");
+const roleDetail = document.getElementById("roleDetail");
 const tipsEl = document.getElementById("tips");
 const modeSwitch = document.getElementById("modeSwitch");
 const modeOptions = document.querySelectorAll(".mode-option");
@@ -48,9 +52,15 @@ function fmt(t) {
 
 function buildContext() {
   const parts = [];
-  if (contextSelect.value) parts.push(contextSelect.value);
-  const detail = contextDetail.value.trim();
-  if (detail) parts.push(detail);
+  if (isInterview()) {
+    if (roleSelect.value) parts.push("Interviewing for " + roleSelect.value);
+    const d = roleDetail.value.trim();
+    if (d) parts.push(d);
+  } else {
+    if (contextSelect.value) parts.push(contextSelect.value);
+    const d = contextDetail.value.trim();
+    if (d) parts.push(d);
+  }
   return parts.join(". ");
 }
 
@@ -75,6 +85,8 @@ function setMode(next) {
     b.setAttribute("aria-selected", active ? "true" : "false");
   });
   modeSwitch.classList.toggle("interview", isInterview());
+  contextBar.hidden = isInterview();
+  interviewContext.hidden = !isInterview();
   updateInterviewUi();
 }
 modeOptions.forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));

@@ -19,7 +19,7 @@
       <button type="button" class="mode-option" data-mode="interview" role="tab" aria-selected="false">Mock interview</button>
     </div>
 
-    <section class="context-bar">
+    <section class="context-bar" id="contextBar">
       <label for="contextSelect" class="prompt-label">Who are you / what's your goal? (optional)</label>
       <select id="contextSelect" class="context-select">
         <option value="">No specific context</option>
@@ -35,6 +35,33 @@
       </select>
       <textarea id="contextDetail" class="prompt-input" rows="2"
         placeholder="Add specifics (optional), e.g. ‘I get nervous and talk too fast in interviews.’"></textarea>
+    </section>
+
+    <section class="context-bar" id="interviewContext" hidden>
+      <label for="roleSelect" class="prompt-label">What are you interviewing for?</label>
+      <select id="roleSelect" class="context-select">
+        <option value="">No specific role</option>
+        <option value="an internship">Internship</option>
+        <option value="an entry-level / new-grad role">Entry-level / new grad</option>
+        <option value="a software engineer role">Software engineer</option>
+        <option value="a senior software engineer role">Senior software engineer</option>
+        <option value="a product manager role">Product manager</option>
+        <option value="a data analyst or data scientist role">Data analyst / scientist</option>
+        <option value="a UX / UI designer role">Designer (UX / UI)</option>
+        <option value="a marketing role">Marketing</option>
+        <option value="a sales role">Sales</option>
+        <option value="a customer success or support role">Customer success / support</option>
+        <option value="a management consulting role (case interview)">Consulting (case interview)</option>
+        <option value="a finance or accounting role">Finance / accounting</option>
+        <option value="a management or leadership role">Manager / leadership</option>
+        <option value="a nursing or healthcare role">Nurse / healthcare</option>
+        <option value="a teaching or education role">Teacher / education</option>
+        <option value="graduate school or university admission">Grad school / university admission</option>
+        <option value="a club or student organization">Club / student organization</option>
+        <option value="">Other — describe below ↓</option>
+      </select>
+      <textarea id="roleDetail" class="prompt-input" rows="2"
+        placeholder="Specific role you're interviewing for (optional), e.g. ‘Senior Frontend Engineer at a fintech startup’"></textarea>
     </section>
 
     <section class="prompt-bar">
