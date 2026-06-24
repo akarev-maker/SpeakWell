@@ -12,13 +12,21 @@ INSTRUCTION = (
     "with this exact shape:\n"
     '{"scores": {"filler_words": int, "pace_pauses": int, '
     '"clarity_structure": int, "confidence_tone": int}, '
-    '"transcript": string, "filler_words": [string], "feedback": string}\n'
-    "Each score is an integer 0-100 (higher is better). "
+    '"transcript": string, "filler_words": [string], "feedback": string, '
+    '"tips": [string]}\n'
+    "Each score is an integer from 0 to 100 (higher is better). Use the FULL "
+    "range and be precise and discriminating: do NOT default to round numbers "
+    "like 70, 75, or 80 — if the delivery is an 83, score it 83, not 85. "
+    "Avoid clustering scores on multiples of 5 or 10. "
     "'transcript' is a faithful transcript of the speech. "
     "'filler_words' lists the distinct filler words actually used "
     "(e.g. um, uh, like, you know); empty list if none. "
-    "'feedback' is 2-4 sentences of specific, encouraging, actionable coaching "
-    "covering filler words, pace & pauses, clarity & structure, and confidence "
+    "'feedback' is 1-2 sentences summarizing the overall delivery. "
+    "'tips' is a list of 3-5 concrete, specific, actionable improvements the "
+    "speaker can apply next time — each tip a single short imperative sentence "
+    "tied to something they actually did (quote or paraphrase a moment from "
+    "their speech where helpful), not generic advice. Cover the weakest areas "
+    "across filler words, pace & pauses, clarity & structure, and confidence "
     "& tone. Do not wrap the JSON in markdown."
 )
 
@@ -33,23 +41,32 @@ RESPONSE_SCHEMA = {
         "transcript": {"type": "string"},
         "filler_words": {"type": "array", "items": {"type": "string"}},
         "feedback": {"type": "string"},
+        "tips": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["scores", "transcript", "filler_words", "feedback"],
+    "required": ["scores", "transcript", "filler_words", "feedback", "tips"],
 }
 
 
-def build_instruction(prompt: str | None) -> str:
-    """Return the coaching instruction, optionally tailored to a user prompt."""
-    if not prompt or not prompt.strip():
-        return INSTRUCTION
-    return (
-        INSTRUCTION
-        + "\n\nThe speaker was asked to respond to this prompt: "
-        + f'"{prompt.strip()}". '
-        "Take into account how well they addressed the prompt — staying on "
-        "topic and answering what was asked — in the 'clarity_structure' score "
-        "and mention it in the feedback."
-    )
+def build_instruction(prompt: str | None, context: str | None = None) -> str:
+    """Return the coaching instruction, tailored to a user prompt and context."""
+    text = INSTRUCTION
+    if context and context.strip():
+        text += (
+            "\n\nAbout the speaker and their goal: "
+            f'"{context.strip()}". '
+            "Tailor your feedback and tips to this context — make the advice "
+            "relevant to where and why they speak, and weight what matters most "
+            "for their goal."
+        )
+    if prompt and prompt.strip():
+        text += (
+            "\n\nThe speaker was asked to respond to this prompt: "
+            f'"{prompt.strip()}". '
+            "Take into account how well they addressed the prompt — staying on "
+            "topic and answering what was asked — in the 'clarity_structure' "
+            "score and mention it in the feedback."
+        )
+    return text
 
 
 def _build_client() -> genai.Client:
@@ -77,19 +94,21 @@ def parse_response(text: str) -> dict:
     for key in SCORE_KEYS:
         if key not in data["scores"]:
             raise RuntimeError(f"Gemini response missing scores.{key}")
-    for field in ("transcript", "filler_words", "feedback"):
+    for field in ("transcript", "filler_words", "feedback", "tips"):
         if field not in data:
             raise RuntimeError(f"Gemini response missing '{field}'")
     return data
 
 
-def analyze_speech(wav_bytes: bytes, prompt: str | None = None) -> dict:
+def analyze_speech(
+    wav_bytes: bytes, prompt: str | None = None, context: str | None = None
+) -> dict:
     client = _build_client()
     response = client.models.generate_content(
         model=config.GEMINI_MODEL,
         contents=[
             types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
-            build_instruction(prompt),
+            build_instruction(prompt, context),
         ],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

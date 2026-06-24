@@ -21,6 +21,7 @@ def get_prompt():
 async def analyze(
     audio_file: UploadFile = File(..., alias="audio"),
     prompt: str = Form(""),
+    context: str = Form(""),
 ):
     raw = await audio_file.read()
     if len(raw) < MIN_AUDIO_BYTES:
@@ -29,9 +30,10 @@ async def analyze(
             content={"error": "Recording is too short. Please speak for a few seconds."},
         )
     prompt = prompt.strip() or None
+    context = context.strip() or None
     try:
         wav = audio.transcode_to_wav(raw)
-        result = gemini_client.analyze_speech(wav, prompt=prompt)
+        result = gemini_client.analyze_speech(wav, prompt=prompt, context=context)
     except Exception as exc:  # covers ffmpeg/config RuntimeError and google-genai APIError
         return JSONResponse(status_code=500, content={"error": str(exc)})
     return result

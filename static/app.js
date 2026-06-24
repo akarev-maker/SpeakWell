@@ -1,6 +1,9 @@
 const recordBtn = document.getElementById("recordBtn");
 const promptBtn = document.getElementById("promptBtn");
 const promptInput = document.getElementById("promptInput");
+const contextSelect = document.getElementById("contextSelect");
+const contextDetail = document.getElementById("contextDetail");
+const tipsEl = document.getElementById("tips");
 const timerEl = document.getElementById("timer");
 const statusEl = document.getElementById("status");
 const results = document.getElementById("results");
@@ -29,6 +32,14 @@ function fmt(t) {
   const m = Math.floor(t / 60);
   const s = String(t % 60).padStart(2, "0");
   return `${m}:${s}`;
+}
+
+function buildContext() {
+  const parts = [];
+  if (contextSelect.value) parts.push(contextSelect.value);
+  const detail = contextDetail.value.trim();
+  if (detail) parts.push(detail);
+  return parts.join(". ");
 }
 
 promptBtn.addEventListener("click", async () => {
@@ -86,6 +97,7 @@ async function analyze(blob) {
   const fd = new FormData();
   fd.append("audio", blob, "recording.webm");
   fd.append("prompt", promptInput.value.trim());
+  fd.append("context", buildContext());
   try {
     const r = await fetch("/api/analyze", { method: "POST", body: fd });
     const data = await r.json();
@@ -117,6 +129,12 @@ function render(data) {
   }
   transcriptEl.innerHTML = highlight(data.transcript, data.filler_words || []);
   feedbackEl.textContent = data.feedback;
+  tipsEl.innerHTML = "";
+  for (const tip of data.tips || []) {
+    const li = document.createElement("li");
+    li.textContent = tip;
+    tipsEl.appendChild(li);
+  }
   results.hidden = false;
 }
 

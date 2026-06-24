@@ -11,7 +11,14 @@ body {
 .container { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
 header h1 { font-size: 2.5rem; margin: 0; letter-spacing: -0.02em; }
 .tagline { color: var(--muted); margin-top: 0.25rem; }
-.prompt-bar { margin: 2rem 0 1rem; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
+.context-bar { margin: 2rem 0 0; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
+.context-select {
+  width: 100%; font: inherit; font-size: 1.05rem; color: var(--text);
+  background: var(--panel); border: 1px solid #2a3150; border-left: 3px solid var(--accent);
+  border-radius: 8px; padding: 0.7rem 1rem;
+}
+.context-select:focus { outline: none; border-color: var(--accent); }
+.prompt-bar { margin: 1.25rem 0 1rem; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
 .prompt-label { color: var(--muted); font-size: 0.9rem; }
 .prompt-input {
   width: 100%; resize: vertical; font: inherit; font-size: 1.05rem; color: var(--text);
@@ -39,5 +46,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .score-bar { height: 6px; border-radius: 999px; background: #2a3150; margin-top: .5rem; overflow: hidden; }
 .score-bar > span { display: block; height: 100%; }
 .transcript, .feedback { background: var(--panel); border-radius: 12px; padding: 1rem 1.1rem; line-height: 1.6; }
+.tips { background: var(--panel); border-radius: 12px; padding: 1rem 1.1rem 1rem 2.2rem; margin: 0; line-height: 1.6; }
+.tips li { margin: 0.4rem 0; }
+.tips li::marker { color: var(--accent); }
 .filler { background: rgba(248,113,113,.25); color: #fecaca; border-radius: 4px; padding: 0 3px; }
 @media (max-width: 520px) { .scores { grid-template-columns: 1fr; } }

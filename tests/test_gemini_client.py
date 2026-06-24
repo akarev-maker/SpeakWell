@@ -10,7 +10,23 @@ VALID = {
     "transcript": "So um, I think...",
     "filler_words": ["um"],
     "feedback": "Good clarity. You said 'um' a few times.",
+    "tips": ["Pause instead of saying 'um'.", "Slow down the opening sentence."],
 }
+
+
+def test_parse_includes_tips():
+    out = gemini_client.parse_response(json.dumps(VALID))
+    assert out["tips"] == [
+        "Pause instead of saying 'um'.",
+        "Slow down the opening sentence.",
+    ]
+
+
+def test_parse_missing_tips_raises():
+    bad = json.loads(json.dumps(VALID))
+    del bad["tips"]
+    with pytest.raises(RuntimeError, match="tips"):
+        gemini_client.parse_response(json.dumps(bad))
 
 
 def test_parse_valid_response():
@@ -97,3 +113,37 @@ def test_analyze_speech_passes_prompt_into_contents(monkeypatch):
     gemini_client.analyze_speech(b"RIFFWAVE", prompt="Pitch your favorite app.")
     instruction_text = captured["contents"][-1]
     assert "Pitch your favorite app." in instruction_text
+
+
+def test_build_instruction_with_context_includes_it():
+    text = gemini_client.build_instruction(
+        None, context="Junior developer preparing for interviews"
+    )
+    assert "Junior developer preparing for interviews" in text
+    assert "tailor" in text.lower()
+
+
+def test_build_instruction_without_context_is_base():
+    assert gemini_client.build_instruction(None, context=None) == gemini_client.INSTRUCTION
+    assert gemini_client.build_instruction(None, context="") == gemini_client.INSTRUCTION
+
+
+def test_analyze_speech_passes_context_into_contents(monkeypatch):
+    captured = {}
+
+    class FakeResp:
+        text = json.dumps(VALID)
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            captured["contents"] = kwargs["contents"]
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    gemini_client.analyze_speech(
+        b"RIFFWAVE", context="College student seeking internships"
+    )
+    assert "College student seeking internships" in captured["contents"][-1]

@@ -13,6 +13,21 @@
       <p class="tagline">Record yourself. Get coached on how you speak.</p>
     </header>
 
+    <section class="context-bar">
+      <label for="contextSelect" class="prompt-label">Who are you / what's your goal? (optional)</label>
+      <select id="contextSelect" class="context-select">
+        <option value="">No specific context</option>
+        <option value="A college student preparing for internship interviews">College student — internship interviews</option>
+        <option value="A junior developer working on technical communication">Junior developer — technical communication</option>
+        <option value="Someone improving everyday social conversations">Everyday social conversations</option>
+        <option value="Someone preparing for public speaking and presentations">Public speaking / presentations</option>
+        <option value="Someone preparing for job interviews">Job interviews</option>
+        <option value="Someone practicing speaking English as a second language">English as a second language</option>
+      </select>
+      <textarea id="contextDetail" class="prompt-input" rows="2"
+        placeholder="Add specifics (optional), e.g. ‘I get nervous and talk too fast in interviews.’"></textarea>
+    </section>
+
     <section class="prompt-bar">
       <label for="promptInput" class="prompt-label">Your speaking prompt (optional)</label>
       <textarea id="promptInput" class="prompt-input" rows="2"
@@ -33,6 +48,8 @@
       <p id="transcript" class="transcript"></p>
       <h2>Coaching feedback</h2>
       <p id="feedback" class="feedback"></p>
+      <h2>How to improve</h2>
+      <ul id="tips" class="tips"></ul>
     </section>
   </main>
   <script src="/static/app.js"></script>
