@@ -4,6 +4,9 @@ const promptInput = document.getElementById("promptInput");
 const contextSelect = document.getElementById("contextSelect");
 const contextDetail = document.getElementById("contextDetail");
 const tipsEl = document.getElementById("tips");
+const recordingCard = document.getElementById("recordingCard");
+const player = document.getElementById("player");
+const paceEl = document.getElementById("pace");
 const timerEl = document.getElementById("timer");
 const statusEl = document.getElementById("status");
 const results = document.getElementById("results");
@@ -22,6 +25,9 @@ let mediaRecorder = null;
 let chunks = [];
 let timerId = null;
 let seconds = 0;
+let recordStartMs = 0;
+let durationSec = 0;
+let objectUrl = null;
 
 function setStatus(msg, isError = false) {
   statusEl.textContent = msg;
@@ -66,9 +72,12 @@ recordBtn.addEventListener("click", async () => {
     mediaRecorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       stopTimer();
+      durationSec = (Date.now() - recordStartMs) / 1000;
       const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+      setupPlayer(blob);
       analyze(blob);
     };
+    recordStartMs = Date.now();
     mediaRecorder.start();
     startTimer();
     recordBtn.textContent = "■ Stop";
@@ -111,6 +120,35 @@ async function analyze(blob) {
   }
 }
 
+function setupPlayer(blob) {
+  if (objectUrl) URL.revokeObjectURL(objectUrl);
+  objectUrl = URL.createObjectURL(blob);
+  player.src = objectUrl;
+}
+
+function paceLabel(wpm) {
+  if (wpm < 110) return "Relaxed pace";
+  if (wpm <= 150) return "Great conversational pace";
+  if (wpm <= 170) return "A touch fast";
+  return "Quite fast — try slowing down";
+}
+
+function computeWpm(transcript, seconds) {
+  const words = (transcript || "").trim().split(/\s+/).filter(Boolean).length;
+  if (seconds < 1 || words === 0) return null;
+  return Math.round(words / (seconds / 60));
+}
+
+function renderPace(transcript) {
+  const wpm = computeWpm(transcript, durationSec);
+  if (wpm === null) {
+    paceEl.hidden = true;
+    return;
+  }
+  paceEl.textContent = `${wpm} words/min · ${paceLabel(wpm)}`;
+  paceEl.hidden = false;
+}
+
 function colorFor(v) {
   return v >= 75 ? "var(--good)" : v >= 50 ? "var(--mid)" : "var(--bad)";
 }
@@ -135,6 +173,8 @@ function render(data) {
     li.textContent = tip;
     tipsEl.appendChild(li);
   }
+  recordingCard.hidden = false;
+  renderPace(data.transcript);
   results.hidden = false;
 }
 

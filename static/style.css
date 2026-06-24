@@ -158,6 +158,19 @@ button.record.recording {
 .results { margin-top: 1.5rem; }
 .results > h2:first-child { margin-top: 0; }
 
+.recording-card {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  margin-bottom: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.recording-title { font-family: var(--serif); font-size: 1.1rem; }
+.player { width: 100%; height: 40px; accent-color: var(--accent); }
+.pace { color: var(--muted); font-size: 0.95rem; }
+
 .scores {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
