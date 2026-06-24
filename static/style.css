@@ -67,7 +67,24 @@ h2 {
   gap: 0.55rem;
   align-items: stretch;
 }
-.context-bar { margin: 2.25rem 0 0; }
+.customize { margin: 1.75rem 0 0; }
+.customize > summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0;
+  user-select: none;
+}
+.customize > summary::-webkit-details-marker { display: none; }
+.customize > summary:hover { color: var(--accent-dark); }
+.customize .chev { display: inline-block; transition: transform 0.15s ease; }
+.customize[open] > summary .chev { transform: rotate(90deg); }
+
+.context-bar { margin: 1rem 0 0; }
 .prompt-bar { margin: 0.9rem 0 0; }
 
 .interview-toggle {
