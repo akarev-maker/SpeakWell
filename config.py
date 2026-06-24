@@ -3,7 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GEMINI_MODEL = "gemini-2.0-flash"
+# gemini-2.0-flash was shut down 2026-06-01; use the current stable Flash model.
+GEMINI_MODEL = "gemini-2.5-flash"
 
 
 def get_api_key() -> str:

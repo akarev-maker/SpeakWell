@@ -14,4 +14,4 @@ def test_get_api_key_missing_raises(monkeypatch):
 
 
 def test_model_constant():
-    assert config.GEMINI_MODEL == "gemini-2.0-flash"
+    assert config.GEMINI_MODEL == "gemini-2.5-flash"

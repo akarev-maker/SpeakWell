@@ -54,7 +54,7 @@ def test_analyze_speech_uses_client(monkeypatch):
 
     class FakeModels:
         def generate_content(self, **kwargs):
-            assert kwargs["model"] == "gemini-2.0-flash"
+            assert kwargs["model"] == "gemini-2.5-flash"
             return FakeResp()
 
     class FakeClient:
