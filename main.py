@@ -10,6 +10,7 @@ import prompts
 app = FastAPI(title="SpeakWell")
 
 MIN_AUDIO_BYTES = 1000  # reject trivially short/empty recordings
+MAX_AUDIO_BYTES = 25 * 1024 * 1024  # 25 MB cap to bound memory use
 
 
 @app.get("/api/prompt")
@@ -28,6 +29,11 @@ async def analyze(
         return JSONResponse(
             status_code=400,
             content={"error": "Recording is too short. Please speak for a few seconds."},
+        )
+    if len(raw) > MAX_AUDIO_BYTES:
+        return JSONResponse(
+            status_code=413,
+            content={"error": "Recording is too large. Please keep it under 25 MB."},
         )
     prompt = prompt.strip() or None
     context = context.strip() or None

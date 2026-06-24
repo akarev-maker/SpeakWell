@@ -105,6 +105,16 @@ def test_analyze_blank_prompt_becomes_none(client, monkeypatch):
     assert captured["prompt"] is None
 
 
+def test_analyze_rejects_oversized_audio(client, monkeypatch):
+    monkeypatch.setattr(main, "MAX_AUDIO_BYTES", 2000)
+    resp = client.post(
+        "/api/analyze",
+        files={"audio": ("rec.webm", io.BytesIO(b"x" * 3000), "audio/webm")},
+    )
+    assert resp.status_code == 413
+    assert "error" in resp.json()
+
+
 def test_analyze_empty_audio_rejected(client):
     resp = client.post(
         "/api/analyze",
