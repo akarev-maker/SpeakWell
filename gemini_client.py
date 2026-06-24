@@ -120,13 +120,6 @@ PROMPT_INSTRUCTION = (
     "Return ONLY the prompt text — no quotes, no preamble, no numbering."
 )
 
-INTERVIEW_QUESTION_INSTRUCTION = (
-    "Generate ONE realistic interview question for a candidate. Their goal/"
-    'context is: "{context}". Make it a question a real interviewer would ask '
-    "for that context (behavioral or role-appropriate). "
-    "Return ONLY the question text — no quotes, no preamble, no numbering."
-)
-
 
 def _build_client() -> genai.Client:
     return genai.Client(api_key=config.get_api_key())
@@ -238,19 +231,6 @@ def summarize_interview(context: str, qa_pairs: list[dict]) -> dict:
     return data
 
 
-def generate_interview_question(context: str) -> str:
-    """Generate one realistic interview question tailored to the context."""
-    client = _build_client()
-    response = client.models.generate_content(
-        model=config.GEMINI_MODEL,
-        contents=[INTERVIEW_QUESTION_INSTRUCTION.format(context=context.strip())],
-    )
-    text = (response.text or "").strip().strip('"').strip()
-    if not text:
-        raise RuntimeError("Gemini returned an empty interview question")
-    return text
-
-
 def parse_json(text: str) -> dict:
     """Strip any markdown fence and parse a JSON object from a Gemini response."""
     if not text:
@@ -282,11 +262,11 @@ def parse_response(text: str, require_interview: bool = False) -> dict:
     for field in required:
         if field not in data:
             raise RuntimeError(f"Gemini response missing '{field}'")
+    # score_reasons is requested via the schema but optional here: if it is
+    # absent or malformed we drop it rather than fail the whole analysis (the
+    # frontend simply omits the "Why this score?" affordance).
     if not isinstance(data.get("score_reasons"), dict):
-        raise RuntimeError("Gemini response missing 'score_reasons' object")
-    for key in SCORE_KEYS:
-        if key not in data["score_reasons"]:
-            raise RuntimeError(f"Gemini response missing score_reasons.{key}")
+        data.pop("score_reasons", None)
     return data
 
 

@@ -37,24 +37,6 @@ def test_prompt_falls_back_when_generation_fails(client, monkeypatch):
     assert resp.json()["prompt"]  # a fallback random prompt
 
 
-def test_interview_question_tailored(client, monkeypatch):
-    monkeypatch.setattr(
-        main.gemini_client, "generate_interview_question", lambda c: f"Q for {c}"
-    )
-    resp = client.post("/api/interview-question", data={"context": "Junior dev"})
-    assert resp.status_code == 200
-    assert resp.json()["question"] == "Q for Junior dev"
-
-
-def test_interview_question_fallback(client, monkeypatch):
-    def boom(c):
-        raise RuntimeError("down")
-    monkeypatch.setattr(main.gemini_client, "generate_interview_question", boom)
-    resp = client.post("/api/interview-question", data={"context": "Junior dev"})
-    assert resp.status_code == 200
-    assert resp.json()["question"]  # fallback built-in question
-
-
 def test_interview_start_from_jd(client, monkeypatch):
     captured = {}
 

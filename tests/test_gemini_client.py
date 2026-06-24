@@ -26,18 +26,20 @@ def test_parse_includes_score_reasons():
     assert out["score_reasons"]["filler_words"].startswith("You said 'um'")
 
 
-def test_parse_missing_score_reasons_raises():
+def test_parse_without_score_reasons_still_succeeds():
+    # Missing score_reasons should degrade gracefully, not fail the analysis.
     bad = json.loads(json.dumps(VALID))
     del bad["score_reasons"]
-    with pytest.raises(RuntimeError, match="score_reasons"):
-        gemini_client.parse_response(json.dumps(bad))
+    out = gemini_client.parse_response(json.dumps(bad))
+    assert out["scores"]["filler_words"] == 72
+    assert "score_reasons" not in out
 
 
-def test_parse_missing_one_score_reason_raises():
+def test_parse_drops_malformed_score_reasons():
     bad = json.loads(json.dumps(VALID))
-    del bad["score_reasons"]["pace_pauses"]
-    with pytest.raises(RuntimeError, match="score_reasons"):
-        gemini_client.parse_response(json.dumps(bad))
+    bad["score_reasons"] = "not an object"
+    out = gemini_client.parse_response(json.dumps(bad))
+    assert "score_reasons" not in out
 
 
 VALID_INTERVIEW = {
@@ -188,23 +190,6 @@ def test_summarize_interview_missing_field_raises(monkeypatch):
     monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
     with pytest.raises(RuntimeError, match="improvements"):
         gemini_client.summarize_interview("x", [{"question": "q", "answer": "a"}])
-
-
-def test_generate_interview_question_embeds_context(monkeypatch):
-    class FakeResp:
-        text = '"Tell me about a time you handled conflict."'
-
-    class FakeModels:
-        def generate_content(self, **kwargs):
-            assert "Junior developer" in kwargs["contents"][0]
-            return FakeResp()
-
-    class FakeClient:
-        models = FakeModels()
-
-    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
-    out = gemini_client.generate_interview_question("Junior developer interviews")
-    assert out == "Tell me about a time you handled conflict."
 
 
 def test_analyze_speech_interview_returns_extra_fields(monkeypatch):

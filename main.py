@@ -26,17 +26,6 @@ def get_prompt(context: str = Form("")):
     return {"prompt": prompts.random_prompt()}
 
 
-@app.post("/api/interview-question")
-def get_interview_question(context: str = Form("")):
-    context = context.strip()
-    if context:
-        try:
-            return {"question": gemini_client.generate_interview_question(context)}
-        except Exception:
-            pass  # fall back to a built-in interview question below
-    return {"question": prompts.random_interview_question()}
-
-
 @app.post("/api/interview/start")
 def interview_start(jd: str = Form(""), context: str = Form("")):
     ctx = jd.strip() or context.strip()

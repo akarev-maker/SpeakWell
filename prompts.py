@@ -29,10 +29,6 @@ def random_prompt() -> str:
     return random.choice(PROMPTS)
 
 
-def random_interview_question() -> str:
-    return random.choice(INTERVIEW_QUESTIONS)
-
-
 def interview_question_set(n: int = 4) -> list[str]:
     n = max(1, min(n, len(INTERVIEW_QUESTIONS)))
     return random.sample(INTERVIEW_QUESTIONS, n)

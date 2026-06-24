@@ -20,13 +20,11 @@ const promptInput = document.getElementById("promptInput");
 const contextSelect = document.getElementById("contextSelect");
 const contextDetail = document.getElementById("contextDetail");
 const contextBar = document.getElementById("contextBar");
-const interviewContext = document.getElementById("interviewContext");
 const roleSelect = document.getElementById("roleSelect");
 const roleDetail = document.getElementById("roleDetail");
 const tipsEl = document.getElementById("tips");
 const modeSwitch = document.getElementById("modeSwitch");
 const modeOptions = document.querySelectorAll(".mode-option");
-const promptLabel = document.getElementById("promptLabel");
 const interviewCard = document.getElementById("interviewCard");
 const answerCritique = document.getElementById("answerCritique");
 const modelAnswer = document.getElementById("modelAnswer");
@@ -187,7 +185,7 @@ async function startInterview() {
     if (!r.ok) throw new Error();
     const data = await r.json();
     if (!data.questions || !data.questions.length) throw new Error();
-    session = { questions: data.questions, index: 0, answers: [], jd, context: jd || role, done: false };
+    session = { questions: data.questions, index: 0, answers: [], jd, context: jd || role, done: false, step: "main", turn: 0 };
     setStatus("");
     showQuestion();
   } catch {
@@ -207,6 +205,7 @@ async function afterSessionAnswer(data) {
 
   // Only the main answer earns a follow-up (one per question, no nesting).
   if (session.step !== "main") return;
+  const turnAtFetch = session.turn;
   setStatus("Thinking of a follow-up…");
   try {
     const fd = new FormData();
@@ -215,15 +214,19 @@ async function afterSessionAnswer(data) {
     fd.append("answer", transcript);
     const r = await fetch("/api/interview/followup", { method: "POST", body: fd });
     const fu = await r.json();
+    // Ignore a late follow-up if the user already advanced or restarted.
+    if (!session || session.done || session.step !== "main" || session.turn !== turnAtFetch) return;
     setStatus("");
     if (fu.followup) presentFollowup(fu.followup);
   } catch {
-    setStatus("");  // no follow-up; user just clicks Next
+    if (session && session.turn === turnAtFetch) setStatus("");
   }
 }
 
 nextQuestionBtn.addEventListener("click", () => {
   if (!session) return;
+  session.turn += 1;  // invalidate any in-flight follow-up for the previous turn
+  setStatus("");
   if (session.index < session.questions.length - 1) {
     session.index += 1;
     showQuestion();
