@@ -1,5 +1,6 @@
 # tests/test_main.py
 import io
+import json
 import pytest
 from fastapi.testclient import TestClient
 
@@ -52,6 +53,67 @@ def test_interview_question_fallback(client, monkeypatch):
     resp = client.post("/api/interview-question", data={"context": "Junior dev"})
     assert resp.status_code == 200
     assert resp.json()["question"]  # fallback built-in question
+
+
+def test_interview_start_from_jd(client, monkeypatch):
+    captured = {}
+
+    def fake_gen(ctx):
+        captured["ctx"] = ctx
+        return ["Q1?", "Q2?"]
+
+    monkeypatch.setattr(main.gemini_client, "generate_interview_questions", fake_gen)
+    resp = client.post(
+        "/api/interview/start",
+        data={"jd": "Backend engineer at a payments company"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["questions"] == ["Q1?", "Q2?"]
+    assert "payments" in captured["ctx"]
+
+
+def test_interview_start_falls_back(client, monkeypatch):
+    def boom(ctx):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(main.gemini_client, "generate_interview_questions", boom)
+    resp = client.post("/api/interview/start", data={"jd": "anything"})
+    assert resp.status_code == 200
+    assert len(resp.json()["questions"]) >= 1  # built-in fallback set
+
+
+def test_interview_summary(client, monkeypatch):
+    captured = {}
+
+    def fake_sum(ctx, qa):
+        captured["qa"] = qa
+        return {"level": "Getting there", "summary": "ok",
+                "strengths": ["a"], "improvements": ["b"]}
+
+    monkeypatch.setattr(main.gemini_client, "summarize_interview", fake_sum)
+    resp = client.post(
+        "/api/interview/summary",
+        data={
+            "jd": "SWE role",
+            "answers": json.dumps([{"question": "Q1?", "answer": "my answer"}]),
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["level"] == "Getting there"
+    assert captured["qa"] == [{"question": "Q1?", "answer": "my answer"}]
+
+
+def test_interview_summary_handles_error(client, monkeypatch):
+    def boom(ctx, qa):
+        raise RuntimeError("summary down")
+
+    monkeypatch.setattr(main.gemini_client, "summarize_interview", boom)
+    resp = client.post(
+        "/api/interview/summary",
+        data={"answers": json.dumps([{"question": "q", "answer": "a"}])},
+    )
+    assert resp.status_code == 500
+    assert "error" in resp.json()
 
 
 def test_analyze_interview_forwards_question_and_returns_extra(client, monkeypatch):

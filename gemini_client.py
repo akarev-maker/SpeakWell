@@ -125,6 +125,80 @@ def generate_prompt(context: str) -> str:
     return text
 
 
+QUESTIONS_SCHEMA = {
+    "type": "object",
+    "properties": {"questions": {"type": "array", "items": {"type": "string"}}},
+    "required": ["questions"],
+}
+
+SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "level": {"type": "string"},
+        "summary": {"type": "string"},
+        "strengths": {"type": "array", "items": {"type": "string"}},
+        "improvements": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["level", "summary", "strengths", "improvements"],
+}
+
+
+def generate_interview_questions(context: str) -> list[str]:
+    """Generate a tailored set of interview questions (model decides the count)."""
+    instruction = (
+        "You are an interviewer. Generate a set of interview questions for a "
+        f'candidate. Their target role / job description is: "{context.strip()}". '
+        "Choose an appropriate NUMBER of questions for the role and seniority "
+        "(between 3 and 8). Order them as a real interview would (warm-up first, "
+        "harder/role-specific later). Return ONLY a JSON object of the form "
+        '{"questions": [string, ...]}.'
+    )
+    client = _build_client()
+    response = client.models.generate_content(
+        model=config.GEMINI_MODEL,
+        contents=[instruction],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=QUESTIONS_SCHEMA,
+        ),
+    )
+    data = parse_json(response.text)
+    questions = [q for q in data.get("questions", []) if isinstance(q, str) and q.strip()]
+    if not questions:
+        raise RuntimeError("Gemini returned an empty question set")
+    return questions[:8]
+
+
+def summarize_interview(context: str, qa_pairs: list[dict]) -> dict:
+    """Produce an overall readiness debrief across all answered questions."""
+    transcript = "\n\n".join(
+        f"Q: {p.get('question', '')}\nA: {p.get('answer', '')}" for p in qa_pairs
+    )
+    instruction = (
+        "You are an interview coach giving an overall readiness debrief. The "
+        f'candidate is preparing for: "{context.strip()}". Here is the full mock '
+        f"interview (each question and the candidate's spoken answer):\n\n{transcript}\n\n"
+        "Assess overall readiness across all answers. Return ONLY a JSON object: "
+        '{"level": string (a short readiness label, e.g. "Almost ready", '
+        '"Getting there", "Needs work"), "summary": string (2-3 sentences), '
+        '"strengths": [string], "improvements": [string] (concrete and specific)}.'
+    )
+    client = _build_client()
+    response = client.models.generate_content(
+        model=config.GEMINI_MODEL,
+        contents=[instruction],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=SUMMARY_SCHEMA,
+        ),
+    )
+    data = parse_json(response.text)
+    for field in ("level", "summary", "strengths", "improvements"):
+        if field not in data:
+            raise RuntimeError(f"Interview summary missing '{field}'")
+    return data
+
+
 def generate_interview_question(context: str) -> str:
     """Generate one realistic interview question tailored to the context."""
     client = _build_client()
@@ -138,7 +212,8 @@ def generate_interview_question(context: str) -> str:
     return text
 
 
-def parse_response(text: str, require_interview: bool = False) -> dict:
+def parse_json(text: str) -> dict:
+    """Strip any markdown fence and parse a JSON object from a Gemini response."""
     if not text:
         raise RuntimeError("Gemini returned an empty response")
     cleaned = text.strip()
@@ -150,10 +225,13 @@ def parse_response(text: str, require_interview: bool = False) -> dict:
             cleaned = cleaned[len("json"):]
         cleaned = cleaned.strip().rstrip("`").strip()
     try:
-        data = json.loads(cleaned)
+        return json.loads(cleaned)
     except (json.JSONDecodeError, ValueError) as exc:
         raise RuntimeError(f"Could not parse Gemini response: {exc}") from exc
 
+
+def parse_response(text: str, require_interview: bool = False) -> dict:
+    data = parse_json(text)
     if not isinstance(data.get("scores"), dict):
         raise RuntimeError("Gemini response missing 'scores' object")
     for key in SCORE_KEYS:

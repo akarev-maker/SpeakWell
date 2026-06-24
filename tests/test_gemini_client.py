@@ -38,6 +38,98 @@ def test_parse_interview_valid():
     assert out["model_answer"].startswith("In my last role")
 
 
+def test_generate_interview_questions_returns_list(monkeypatch):
+    class FakeResp:
+        text = json.dumps({"questions": ["Q1?", "Q2?", "Q3?"]})
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            assert "Backend role" in kwargs["contents"][0]
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    out = gemini_client.generate_interview_questions("Backend role at a startup")
+    assert out == ["Q1?", "Q2?", "Q3?"]
+
+
+def test_generate_interview_questions_caps_at_8(monkeypatch):
+    class FakeResp:
+        text = json.dumps({"questions": [f"Q{i}?" for i in range(20)]})
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    assert len(gemini_client.generate_interview_questions("x")) == 8
+
+
+def test_generate_interview_questions_empty_raises(monkeypatch):
+    class FakeResp:
+        text = json.dumps({"questions": []})
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    with pytest.raises(RuntimeError, match="empty"):
+        gemini_client.generate_interview_questions("x")
+
+
+def test_summarize_interview_valid(monkeypatch):
+    payload = {
+        "level": "Getting there",
+        "summary": "Clear but vague.",
+        "strengths": ["Calm delivery"],
+        "improvements": ["Add metrics"],
+    }
+
+    class FakeResp:
+        text = json.dumps(payload)
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            assert "What is your strength?" in kwargs["contents"][0]
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    out = gemini_client.summarize_interview(
+        "SWE role",
+        [{"question": "What is your strength?", "answer": "I learn fast."}],
+    )
+    assert out["level"] == "Getting there"
+    assert out["strengths"] == ["Calm delivery"]
+
+
+def test_summarize_interview_missing_field_raises(monkeypatch):
+    class FakeResp:
+        text = json.dumps({"level": "x", "summary": "y", "strengths": []})  # no improvements
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    with pytest.raises(RuntimeError, match="improvements"):
+        gemini_client.summarize_interview("x", [{"question": "q", "answer": "a"}])
+
+
 def test_generate_interview_question_embeds_context(monkeypatch):
     class FakeResp:
         text = '"Tell me about a time you handled conflict."'

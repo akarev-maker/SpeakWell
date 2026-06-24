@@ -1,4 +1,6 @@
 # main.py
+import json
+
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -33,6 +35,30 @@ def get_interview_question(context: str = Form("")):
         except Exception:
             pass  # fall back to a built-in interview question below
     return {"question": prompts.random_interview_question()}
+
+
+@app.post("/api/interview/start")
+def interview_start(jd: str = Form(""), context: str = Form("")):
+    ctx = jd.strip() or context.strip()
+    if ctx:
+        try:
+            return {"questions": gemini_client.generate_interview_questions(ctx)}
+        except Exception:
+            pass  # fall back to a built-in set below
+    return {"questions": prompts.interview_question_set()}
+
+
+@app.post("/api/interview/summary")
+def interview_summary(
+    jd: str = Form(""), context: str = Form(""), answers: str = Form("[]")
+):
+    ctx = jd.strip() or context.strip() or "a job interview"
+    try:
+        qa_pairs = json.loads(answers)
+        result = gemini_client.summarize_interview(ctx, qa_pairs)
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+    return result
 
 
 @app.post("/api/analyze")
