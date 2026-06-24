@@ -156,9 +156,22 @@ function interviewRoleContext() {
 
 function showQuestion() {
   session.done = false;
+  session.step = "main";
+  session.currentQuestion = session.questions[session.index];
   qProgress.textContent = `Question ${session.index + 1} of ${session.questions.length}`;
-  qText.textContent = session.questions[session.index];
+  qText.textContent = session.currentQuestion;
+  results.hidden = true;
+  sessionNav.hidden = true;
   layout();
+}
+
+function presentFollowup(text) {
+  session.step = "followup";
+  session.currentQuestion = text;
+  qProgress.textContent =
+    `Question ${session.index + 1} of ${session.questions.length} · Follow-up`;
+  qText.textContent = text;
+  interviewSession.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 async function startInterview() {
@@ -185,14 +198,28 @@ async function startInterview() {
 }
 startInterviewBtn.addEventListener("click", startInterview);
 
-function afterSessionAnswer(data) {
-  session.answers.push({
-    question: session.questions[session.index],
-    answer: data.transcript || "",
-  });
+async function afterSessionAnswer(data) {
+  const transcript = data.transcript || "";
+  session.answers.push({ question: session.currentQuestion, answer: transcript });
   const last = session.index === session.questions.length - 1;
   nextQuestionBtn.textContent = last ? "Finish & see summary" : "Next question →";
   sessionNav.hidden = false;
+
+  // Only the main answer earns a follow-up (one per question, no nesting).
+  if (session.step !== "main") return;
+  setStatus("Thinking of a follow-up…");
+  try {
+    const fd = new FormData();
+    fd.append("context", session.context);
+    fd.append("question", session.currentQuestion);
+    fd.append("answer", transcript);
+    const r = await fetch("/api/interview/followup", { method: "POST", body: fd });
+    const fu = await r.json();
+    setStatus("");
+    if (fu.followup) presentFollowup(fu.followup);
+  } catch {
+    setStatus("");  // no follow-up; user just clicks Next
+  }
 }
 
 nextQuestionBtn.addEventListener("click", () => {
@@ -286,7 +313,7 @@ async function analyze(blob) {
   const inSession = isInterview() && session && !session.done;
   const fd = new FormData();
   fd.append("audio", blob, "recording.webm");
-  fd.append("prompt", inSession ? session.questions[session.index] : promptInput.value.trim());
+  fd.append("prompt", inSession ? session.currentQuestion : promptInput.value.trim());
   fd.append("context", inSession ? session.context : buildContext());
   if (isInterview()) fd.append("interview", "1");
   try {

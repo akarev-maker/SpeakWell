@@ -38,6 +38,41 @@ def test_parse_interview_valid():
     assert out["model_answer"].startswith("In my last role")
 
 
+def test_generate_followup_embeds_answer(monkeypatch):
+    class FakeResp:
+        text = '"Can you give a specific example?"'
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            assert "I led a migration" in kwargs["contents"][0]
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    out = gemini_client.generate_followup(
+        "SWE role", "Tell me about a project.", "I led a migration."
+    )
+    assert out == "Can you give a specific example?"
+
+
+def test_generate_followup_empty_raises(monkeypatch):
+    class FakeResp:
+        text = ""
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    with pytest.raises(RuntimeError, match="follow-up"):
+        gemini_client.generate_followup("x", "q", "a")
+
+
 def test_generate_interview_questions_returns_list(monkeypatch):
     class FakeResp:
         text = json.dumps({"questions": ["Q1?", "Q2?", "Q3?"]})

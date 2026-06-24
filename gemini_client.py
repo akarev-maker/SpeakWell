@@ -143,6 +143,25 @@ SUMMARY_SCHEMA = {
 }
 
 
+def generate_followup(context: str, question: str, answer: str) -> str:
+    """Generate one follow-up question based on the candidate's answer."""
+    instruction = (
+        "You are an interviewer in a mock interview for: "
+        f'"{context.strip()}". You asked: "{question.strip()}". The candidate '
+        f'answered: "{answer.strip()}". Ask ONE natural follow-up question that '
+        "digs deeper into their answer — probe for specifics, reasoning, or a "
+        "concrete example. Return ONLY the follow-up question text, no quotes."
+    )
+    client = _build_client()
+    response = client.models.generate_content(
+        model=config.GEMINI_MODEL, contents=[instruction]
+    )
+    text = (response.text or "").strip().strip('"').strip()
+    if not text:
+        raise RuntimeError("Gemini returned an empty follow-up")
+    return text
+
+
 def generate_interview_questions(context: str) -> list[str]:
     """Generate a tailored set of interview questions (model decides the count)."""
     instruction = (

@@ -82,6 +82,31 @@ def test_interview_start_falls_back(client, monkeypatch):
     assert len(resp.json()["questions"]) >= 1  # built-in fallback set
 
 
+def test_interview_followup(client, monkeypatch):
+    monkeypatch.setattr(
+        main.gemini_client, "generate_followup", lambda c, q, a: f"FU:{a}"
+    )
+    resp = client.post(
+        "/api/interview/followup",
+        data={"context": "x", "question": "q", "answer": "my answer"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["followup"] == "FU:my answer"
+
+
+def test_interview_followup_empty_on_error(client, monkeypatch):
+    def boom(c, q, a):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(main.gemini_client, "generate_followup", boom)
+    resp = client.post(
+        "/api/interview/followup",
+        data={"context": "x", "question": "q", "answer": "a"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["followup"] == ""
+
+
 def test_interview_summary(client, monkeypatch):
     captured = {}
 

@@ -48,6 +48,16 @@ def interview_start(jd: str = Form(""), context: str = Form("")):
     return {"questions": prompts.interview_question_set()}
 
 
+@app.post("/api/interview/followup")
+def interview_followup(
+    context: str = Form(""), question: str = Form(""), answer: str = Form("")
+):
+    try:
+        return {"followup": gemini_client.generate_followup(context, question, answer)}
+    except Exception:
+        return {"followup": ""}  # empty -> frontend simply skips the follow-up
+
+
 @app.post("/api/interview/summary")
 def interview_summary(
     jd: str = Form(""), context: str = Form(""), answers: str = Form("[]")
