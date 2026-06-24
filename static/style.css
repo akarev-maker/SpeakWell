@@ -68,7 +68,36 @@ h2 {
   align-items: stretch;
 }
 .context-bar { margin: 2.25rem 0 0; }
-.prompt-bar { margin: 1.4rem 0 0; }
+.prompt-bar { margin: 0.9rem 0 0; }
+
+.interview-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 1.4rem 0 0;
+  font-size: 0.95rem;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.interview-toggle input { width: 1.05rem; height: 1.05rem; accent-color: var(--accent); cursor: pointer; }
+
+.interview-card {
+  background: #fbfdfa;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.4rem 1.15rem 1.15rem;
+  margin-bottom: 0.8rem;
+}
+.interview-card .feedback { background: var(--panel); margin: 0.4rem 0 0; }
+.interview-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 .prompt-label {
   color: var(--muted);

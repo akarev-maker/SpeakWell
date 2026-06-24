@@ -24,11 +24,23 @@ def get_prompt(context: str = Form("")):
     return {"prompt": prompts.random_prompt()}
 
 
+@app.post("/api/interview-question")
+def get_interview_question(context: str = Form("")):
+    context = context.strip()
+    if context:
+        try:
+            return {"question": gemini_client.generate_interview_question(context)}
+        except Exception:
+            pass  # fall back to a built-in interview question below
+    return {"question": prompts.random_interview_question()}
+
+
 @app.post("/api/analyze")
 async def analyze(
     audio_file: UploadFile = File(..., alias="audio"),
     prompt: str = Form(""),
     context: str = Form(""),
+    interview: str = Form(""),
 ):
     raw = await audio_file.read()
     if len(raw) < MIN_AUDIO_BYTES:
@@ -43,9 +55,14 @@ async def analyze(
         )
     prompt = prompt.strip() or None
     context = context.strip() or None
+    is_interview = interview.strip().lower() in ("1", "true", "on", "yes")
+    question = prompt if is_interview else None
+    speech_prompt = None if is_interview else prompt
     try:
         wav = audio.transcode_to_wav(raw)
-        result = gemini_client.analyze_speech(wav, prompt=prompt, context=context)
+        result = gemini_client.analyze_speech(
+            wav, prompt=speech_prompt, context=context, question=question
+        )
     except Exception as exc:  # covers ffmpeg/config RuntimeError and google-genai APIError
         return JSONResponse(status_code=500, content={"error": str(exc)})
     return result

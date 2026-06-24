@@ -32,8 +32,13 @@
         placeholder="Add specifics (optional), e.g. ‘I get nervous and talk too fast in interviews.’"></textarea>
     </section>
 
+    <label class="interview-toggle">
+      <input type="checkbox" id="interviewToggle" />
+      <span>🎤 Mock interview mode</span>
+    </label>
+
     <section class="prompt-bar">
-      <label for="promptInput" class="prompt-label">Your speaking prompt (optional)</label>
+      <label for="promptInput" class="prompt-label" id="promptLabel">Your speaking prompt (optional)</label>
       <textarea id="promptInput" class="prompt-input" rows="2"
         placeholder="Type your own prompt to speak about, or click ‘Give me a prompt’…"></textarea>
       <button id="promptBtn" class="secondary">Give me a prompt</button>
@@ -53,6 +58,13 @@
         <div id="pace" class="pace" hidden></div>
       </div>
       <div class="scores" id="scores"></div>
+      <div id="interviewCard" class="interview-card" hidden>
+        <h2>Interview answer</h2>
+        <div class="interview-sub">How you answered</div>
+        <p id="answerCritique" class="feedback"></p>
+        <div class="interview-sub">A stronger answer</div>
+        <p id="modelAnswer" class="feedback"></p>
+      </div>
       <h2>Transcript</h2>
       <p id="transcript" class="transcript"></p>
       <h2>Coaching feedback</h2>

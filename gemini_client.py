@@ -46,6 +46,18 @@ RESPONSE_SCHEMA = {
     "required": ["scores", "transcript", "filler_words", "feedback", "tips"],
 }
 
+INTERVIEW_FIELDS = ["answer_critique", "model_answer"]
+
+INTERVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        **RESPONSE_SCHEMA["properties"],
+        "answer_critique": {"type": "string"},
+        "model_answer": {"type": "string"},
+    },
+    "required": RESPONSE_SCHEMA["required"] + INTERVIEW_FIELDS,
+}
+
 
 def build_instruction(prompt: str | None, context: str | None = None) -> str:
     """Return the coaching instruction, tailored to a user prompt and context."""
@@ -69,11 +81,30 @@ def build_instruction(prompt: str | None, context: str | None = None) -> str:
     return text
 
 
+def build_interview_addendum(question: str) -> str:
+    """Extra instruction appended when analyzing a mock-interview answer."""
+    return (
+        "\n\nThis is a MOCK INTERVIEW. The speaker is answering this interview "
+        f'question: "{question.strip()}". In addition to the fields above, also '
+        'return "answer_critique" (2-3 sentences assessing how well the spoken '
+        "answer addresses the question — relevance, specific examples, structure, "
+        'and what was missing) and "model_answer" (a concise, stronger example '
+        "answer to the same question that the speaker can learn from)."
+    )
+
+
 PROMPT_INSTRUCTION = (
     "Generate ONE short speaking-practice prompt (a single sentence or question) "
     'for someone rehearsing their spoken delivery. Their goal/context is: "{context}". '
     "Make the prompt directly relevant to that context so they can practice for it. "
     "Return ONLY the prompt text — no quotes, no preamble, no numbering."
+)
+
+INTERVIEW_QUESTION_INSTRUCTION = (
+    "Generate ONE realistic interview question for a candidate. Their goal/"
+    'context is: "{context}". Make it a question a real interviewer would ask '
+    "for that context (behavioral or role-appropriate). "
+    "Return ONLY the question text — no quotes, no preamble, no numbering."
 )
 
 
@@ -94,7 +125,20 @@ def generate_prompt(context: str) -> str:
     return text
 
 
-def parse_response(text: str) -> dict:
+def generate_interview_question(context: str) -> str:
+    """Generate one realistic interview question tailored to the context."""
+    client = _build_client()
+    response = client.models.generate_content(
+        model=config.GEMINI_MODEL,
+        contents=[INTERVIEW_QUESTION_INSTRUCTION.format(context=context.strip())],
+    )
+    text = (response.text or "").strip().strip('"').strip()
+    if not text:
+        raise RuntimeError("Gemini returned an empty interview question")
+    return text
+
+
+def parse_response(text: str, require_interview: bool = False) -> dict:
     if not text:
         raise RuntimeError("Gemini returned an empty response")
     cleaned = text.strip()
@@ -115,25 +159,35 @@ def parse_response(text: str) -> dict:
     for key in SCORE_KEYS:
         if key not in data["scores"]:
             raise RuntimeError(f"Gemini response missing scores.{key}")
-    for field in ("transcript", "filler_words", "feedback", "tips"):
+    required = ("transcript", "filler_words", "feedback", "tips")
+    if require_interview:
+        required = required + tuple(INTERVIEW_FIELDS)
+    for field in required:
         if field not in data:
             raise RuntimeError(f"Gemini response missing '{field}'")
     return data
 
 
 def analyze_speech(
-    wav_bytes: bytes, prompt: str | None = None, context: str | None = None
+    wav_bytes: bytes,
+    prompt: str | None = None,
+    context: str | None = None,
+    question: str | None = None,
 ) -> dict:
+    interview = bool(question and question.strip())
+    instruction = build_instruction(prompt, context)
+    if interview:
+        instruction += build_interview_addendum(question)
     client = _build_client()
     response = client.models.generate_content(
         model=config.GEMINI_MODEL,
         contents=[
             types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
-            build_instruction(prompt, context),
+            instruction,
         ],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
-            response_schema=RESPONSE_SCHEMA,
+            response_schema=INTERVIEW_SCHEMA if interview else RESPONSE_SCHEMA,
         ),
     )
-    return parse_response(response.text)
+    return parse_response(response.text, require_interview=interview)

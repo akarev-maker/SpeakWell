@@ -4,6 +4,11 @@ const promptInput = document.getElementById("promptInput");
 const contextSelect = document.getElementById("contextSelect");
 const contextDetail = document.getElementById("contextDetail");
 const tipsEl = document.getElementById("tips");
+const interviewToggle = document.getElementById("interviewToggle");
+const promptLabel = document.getElementById("promptLabel");
+const interviewCard = document.getElementById("interviewCard");
+const answerCritique = document.getElementById("answerCritique");
+const modelAnswer = document.getElementById("modelAnswer");
 const recordingCard = document.getElementById("recordingCard");
 const player = document.getElementById("player");
 const paceEl = document.getElementById("pace");
@@ -48,16 +53,28 @@ function buildContext() {
   return parts.join(". ");
 }
 
+function updateInterviewUi() {
+  const on = interviewToggle.checked;
+  promptBtn.textContent = on ? "Give me an interview question" : "Give me a prompt";
+  promptLabel.textContent = on ? "Interview question" : "Your speaking prompt (optional)";
+  promptInput.placeholder = on
+    ? "Click ‘Give me an interview question’, or type your own…"
+    : "Type your own prompt to speak about, or click ‘Give me a prompt’…";
+}
+interviewToggle.addEventListener("change", updateInterviewUi);
+
 promptBtn.addEventListener("click", async () => {
+  const on = interviewToggle.checked;
   promptBtn.disabled = true;
-  setStatus("Finding a prompt for you…");
+  setStatus(on ? "Finding an interview question…" : "Finding a prompt for you…");
   try {
     const fd = new FormData();
     fd.append("context", buildContext());
-    const r = await fetch("/api/prompt", { method: "POST", body: fd });
+    const url = on ? "/api/interview-question" : "/api/prompt";
+    const r = await fetch(url, { method: "POST", body: fd });
     if (!r.ok) throw new Error();
     const data = await r.json();
-    promptInput.value = data.prompt;
+    promptInput.value = on ? data.question : data.prompt;
     setStatus("");
   } catch {
     setStatus("Could not load a prompt.", true);
@@ -114,6 +131,7 @@ async function analyze(blob) {
   fd.append("audio", blob, "recording.webm");
   fd.append("prompt", promptInput.value.trim());
   fd.append("context", buildContext());
+  if (interviewToggle.checked) fd.append("interview", "1");
   try {
     const r = await fetch("/api/analyze", { method: "POST", body: fd });
     const data = await r.json();
@@ -171,6 +189,13 @@ function render(data) {
       `<div class="value">${v}</div>` +
       `<div class="score-bar"><span style="width:${v}%;background:${colorFor(v)}"></span></div>`;
     scoresEl.appendChild(card);
+  }
+  if (data.answer_critique && data.model_answer) {
+    answerCritique.textContent = data.answer_critique;
+    modelAnswer.textContent = data.model_answer;
+    interviewCard.hidden = false;
+  } else {
+    interviewCard.hidden = true;
   }
   transcriptEl.innerHTML = highlight(data.transcript, data.filler_words || []);
   feedbackEl.textContent = data.feedback;

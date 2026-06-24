@@ -13,5 +13,21 @@ PROMPTS = [
 ]
 
 
+INTERVIEW_QUESTIONS = [
+    "Tell me about yourself.",
+    "Why do you want this role?",
+    "Tell me about a time you faced a challenge and how you handled it.",
+    "What is your greatest strength, and how have you used it?",
+    "Describe a time you worked on a team and there was a conflict.",
+    "Where do you see yourself in five years?",
+    "Tell me about a mistake you made and what you learned.",
+    "Why should we hire you?",
+]
+
+
 def random_prompt() -> str:
     return random.choice(PROMPTS)
+
+
+def random_interview_question() -> str:
+    return random.choice(INTERVIEW_QUESTIONS)

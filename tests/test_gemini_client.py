@@ -15,6 +15,69 @@ VALID = {
 }
 
 
+VALID_INTERVIEW = {
+    **VALID,
+    "answer_critique": "Relevant but lacked a concrete example.",
+    "model_answer": "In my last role, I led a migration that cut costs 20%.",
+}
+
+
+def test_parse_interview_requires_extra_fields():
+    # Without require_interview, the normal payload (no extra fields) is fine.
+    gemini_client.parse_response(json.dumps(VALID))
+    # With require_interview, missing answer_critique/model_answer raises.
+    with pytest.raises(RuntimeError, match="answer_critique"):
+        gemini_client.parse_response(json.dumps(VALID), require_interview=True)
+
+
+def test_parse_interview_valid():
+    out = gemini_client.parse_response(
+        json.dumps(VALID_INTERVIEW), require_interview=True
+    )
+    assert out["answer_critique"].startswith("Relevant")
+    assert out["model_answer"].startswith("In my last role")
+
+
+def test_generate_interview_question_embeds_context(monkeypatch):
+    class FakeResp:
+        text = '"Tell me about a time you handled conflict."'
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            assert "Junior developer" in kwargs["contents"][0]
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    out = gemini_client.generate_interview_question("Junior developer interviews")
+    assert out == "Tell me about a time you handled conflict."
+
+
+def test_analyze_speech_interview_returns_extra_fields(monkeypatch):
+    captured = {}
+
+    class FakeResp:
+        text = json.dumps(VALID_INTERVIEW)
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            captured["contents"] = kwargs["contents"]
+            return FakeResp()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(gemini_client, "_build_client", lambda: FakeClient())
+    out = gemini_client.analyze_speech(
+        b"RIFFWAVE", question="Why do you want this job?"
+    )
+    assert out["model_answer"].startswith("In my last role")
+    # The question is embedded in the instruction sent to the model.
+    assert "Why do you want this job?" in captured["contents"][-1]
+
+
 def test_parse_includes_tips():
     out = gemini_client.parse_response(json.dumps(VALID))
     assert out["tips"] == [
