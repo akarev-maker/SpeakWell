@@ -37,41 +37,56 @@
         placeholder="Add specifics (optional), e.g. ‘I get nervous and talk too fast in interviews.’"></textarea>
     </section>
 
-    <section class="context-bar" id="interviewContext" hidden>
-      <label for="roleSelect" class="prompt-label">What are you interviewing for?</label>
-      <select id="roleSelect" class="context-select">
-        <option value="">No specific role</option>
-        <option value="an internship">Internship</option>
-        <option value="an entry-level / new-grad role">Entry-level / new grad</option>
-        <option value="a software engineer role">Software engineer</option>
-        <option value="a senior software engineer role">Senior software engineer</option>
-        <option value="a product manager role">Product manager</option>
-        <option value="a data analyst or data scientist role">Data analyst / scientist</option>
-        <option value="a UX / UI designer role">Designer (UX / UI)</option>
-        <option value="a marketing role">Marketing</option>
-        <option value="a sales role">Sales</option>
-        <option value="a customer success or support role">Customer success / support</option>
-        <option value="a management consulting role (case interview)">Consulting (case interview)</option>
-        <option value="a finance or accounting role">Finance / accounting</option>
-        <option value="a management or leadership role">Manager / leadership</option>
-        <option value="a nursing or healthcare role">Nurse / healthcare</option>
-        <option value="a teaching or education role">Teacher / education</option>
-        <option value="graduate school or university admission">Grad school / university admission</option>
-        <option value="a club or student organization">Club / student organization</option>
-        <option value="">Other — describe below ↓</option>
-      </select>
-      <textarea id="roleDetail" class="prompt-input" rows="2"
-        placeholder="Specific role you're interviewing for (optional), e.g. ‘Senior Frontend Engineer at a fintech startup’"></textarea>
-    </section>
+    <div id="interviewStart" hidden>
+      <section class="context-bar">
+        <label for="jdInput" class="prompt-label">Paste the job description</label>
+        <textarea id="jdInput" class="prompt-input" rows="5"
+          placeholder="Paste the job posting here — your questions will be tailored to it…"></textarea>
+      </section>
 
-    <section class="prompt-bar">
+      <section class="context-bar" id="interviewContext">
+        <label for="roleSelect" class="prompt-label">No job description? Pick a role</label>
+        <select id="roleSelect" class="context-select">
+          <option value="">No specific role</option>
+          <option value="an internship">Internship</option>
+          <option value="an entry-level / new-grad role">Entry-level / new grad</option>
+          <option value="a software engineer role">Software engineer</option>
+          <option value="a senior software engineer role">Senior software engineer</option>
+          <option value="a product manager role">Product manager</option>
+          <option value="a data analyst or data scientist role">Data analyst / scientist</option>
+          <option value="a UX / UI designer role">Designer (UX / UI)</option>
+          <option value="a marketing role">Marketing</option>
+          <option value="a sales role">Sales</option>
+          <option value="a customer success or support role">Customer success / support</option>
+          <option value="a management consulting role (case interview)">Consulting (case interview)</option>
+          <option value="a finance or accounting role">Finance / accounting</option>
+          <option value="a management or leadership role">Manager / leadership</option>
+          <option value="a nursing or healthcare role">Nurse / healthcare</option>
+          <option value="a teaching or education role">Teacher / education</option>
+          <option value="graduate school or university admission">Grad school / university admission</option>
+          <option value="a club or student organization">Club / student organization</option>
+          <option value="">Other — describe below ↓</option>
+        </select>
+        <textarea id="roleDetail" class="prompt-input" rows="2"
+          placeholder="Specific role (optional), e.g. ‘Senior Frontend Engineer at a fintech startup’"></textarea>
+      </section>
+
+      <button id="startInterviewBtn" class="primary">Start interview →</button>
+    </div>
+
+    <div id="interviewSession" hidden>
+      <div class="q-progress" id="qProgress"></div>
+      <p class="q-text" id="qText"></p>
+    </div>
+
+    <section class="prompt-bar" id="promptBar">
       <label for="promptInput" class="prompt-label" id="promptLabel">Your speaking prompt (optional)</label>
       <textarea id="promptInput" class="prompt-input" rows="2"
         placeholder="Type your own prompt to speak about, or click ‘Give me a prompt’…"></textarea>
       <button id="promptBtn" class="secondary">Give me a prompt</button>
     </section>
 
-    <section class="recorder">
+    <section class="recorder" id="recorder">
       <button id="recordBtn" class="record">● Record</button>
       <span id="timer" class="timer">0:00</span>
     </section>
@@ -98,6 +113,23 @@
       <p id="feedback" class="feedback"></p>
       <h2>How to improve</h2>
       <ul id="tips" class="tips"></ul>
+    </section>
+
+    <div id="sessionNav" hidden>
+      <button id="nextQuestionBtn" class="primary">Next question →</button>
+    </div>
+
+    <section id="interviewSummary" class="results" hidden>
+      <h2>Interview readiness</h2>
+      <div class="summary-card">
+        <div class="summary-level" id="summaryLevel"></div>
+        <p class="feedback" id="summaryText"></p>
+        <div class="interview-sub">Strengths</div>
+        <ul id="summaryStrengths" class="tips"></ul>
+        <div class="interview-sub">Focus on</div>
+        <ul id="summaryImprovements" class="tips"></ul>
+      </div>
+      <button id="restartInterviewBtn" class="secondary">Start over</button>
     </section>
   </main>
   <script src="/static/app.js"></script>

@@ -1,4 +1,20 @@
 const recordBtn = document.getElementById("recordBtn");
+const recorder = document.getElementById("recorder");
+const promptBar = document.getElementById("promptBar");
+const interviewStart = document.getElementById("interviewStart");
+const interviewSession = document.getElementById("interviewSession");
+const interviewSummary = document.getElementById("interviewSummary");
+const jdInput = document.getElementById("jdInput");
+const startInterviewBtn = document.getElementById("startInterviewBtn");
+const qProgress = document.getElementById("qProgress");
+const qText = document.getElementById("qText");
+const sessionNav = document.getElementById("sessionNav");
+const nextQuestionBtn = document.getElementById("nextQuestionBtn");
+const restartInterviewBtn = document.getElementById("restartInterviewBtn");
+const summaryLevel = document.getElementById("summaryLevel");
+const summaryText = document.getElementById("summaryText");
+const summaryStrengths = document.getElementById("summaryStrengths");
+const summaryImprovements = document.getElementById("summaryImprovements");
 const promptBtn = document.getElementById("promptBtn");
 const promptInput = document.getElementById("promptInput");
 const contextSelect = document.getElementById("contextSelect");
@@ -67,13 +83,24 @@ function buildContext() {
 let mode = "practice";
 const isInterview = () => mode === "interview";
 
-function updateInterviewUi() {
-  const on = isInterview();
-  promptBtn.textContent = on ? "Give me an interview question" : "Give me a prompt";
-  promptLabel.textContent = on ? "Interview question" : "Your speaking prompt (optional)";
-  promptInput.placeholder = on
-    ? "Click ‘Give me an interview question’, or type your own…"
-    : "Type your own prompt to speak about, or click ‘Give me a prompt’…";
+let session = null;
+
+function layout() {
+  const interview = isInterview();
+  const idle = interview && !session;
+  const inQuestion = interview && session && !session.done;
+  const inSummary = interview && session && session.done;
+
+  contextBar.hidden = interview;
+  promptBar.hidden = interview;
+  interviewStart.hidden = !idle;
+  interviewSession.hidden = !inQuestion;
+  interviewSummary.hidden = !inSummary;
+  recorder.hidden = interview && !inQuestion;
+  if (!inQuestion) {
+    results.hidden = true;
+    sessionNav.hidden = true;
+  }
 }
 
 function setMode(next) {
@@ -85,30 +112,131 @@ function setMode(next) {
     b.setAttribute("aria-selected", active ? "true" : "false");
   });
   modeSwitch.classList.toggle("interview", isInterview());
-  contextBar.hidden = isInterview();
-  interviewContext.hidden = !isInterview();
-  updateInterviewUi();
+  session = null;
+  setStatus("");
+  layout();
 }
 modeOptions.forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 
 promptBtn.addEventListener("click", async () => {
-  const on = isInterview();
   promptBtn.disabled = true;
-  setStatus(on ? "Finding an interview question…" : "Finding a prompt for you…");
+  setStatus("Finding a prompt for you…");
   try {
     const fd = new FormData();
     fd.append("context", buildContext());
-    const url = on ? "/api/interview-question" : "/api/prompt";
-    const r = await fetch(url, { method: "POST", body: fd });
+    const r = await fetch("/api/prompt", { method: "POST", body: fd });
     if (!r.ok) throw new Error();
     const data = await r.json();
-    promptInput.value = on ? data.question : data.prompt;
+    promptInput.value = data.prompt;
     setStatus("");
   } catch {
     setStatus("Could not load a prompt.", true);
   } finally {
     promptBtn.disabled = false;
   }
+});
+
+// ----- Interview session controller -----
+function fillList(ul, items) {
+  ul.innerHTML = "";
+  for (const it of items || []) {
+    const li = document.createElement("li");
+    li.textContent = it;
+    ul.appendChild(li);
+  }
+}
+
+function interviewRoleContext() {
+  const parts = [];
+  if (roleSelect.value) parts.push("Interviewing for " + roleSelect.value);
+  const d = roleDetail.value.trim();
+  if (d) parts.push(d);
+  return parts.join(". ");
+}
+
+function showQuestion() {
+  session.done = false;
+  qProgress.textContent = `Question ${session.index + 1} of ${session.questions.length}`;
+  qText.textContent = session.questions[session.index];
+  layout();
+}
+
+async function startInterview() {
+  const jd = jdInput.value.trim();
+  const role = interviewRoleContext();
+  startInterviewBtn.disabled = true;
+  setStatus("Preparing your interview…");
+  try {
+    const fd = new FormData();
+    fd.append("jd", jd);
+    fd.append("context", role);
+    const r = await fetch("/api/interview/start", { method: "POST", body: fd });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    if (!data.questions || !data.questions.length) throw new Error();
+    session = { questions: data.questions, index: 0, answers: [], jd, context: jd || role, done: false };
+    setStatus("");
+    showQuestion();
+  } catch {
+    setStatus("Couldn't start the interview. Try again.", true);
+  } finally {
+    startInterviewBtn.disabled = false;
+  }
+}
+startInterviewBtn.addEventListener("click", startInterview);
+
+function afterSessionAnswer(data) {
+  session.answers.push({
+    question: session.questions[session.index],
+    answer: data.transcript || "",
+  });
+  const last = session.index === session.questions.length - 1;
+  nextQuestionBtn.textContent = last ? "Finish & see summary" : "Next question →";
+  sessionNav.hidden = false;
+}
+
+nextQuestionBtn.addEventListener("click", () => {
+  if (!session) return;
+  if (session.index < session.questions.length - 1) {
+    session.index += 1;
+    showQuestion();
+  } else {
+    finishInterview();
+  }
+});
+
+async function finishInterview() {
+  sessionNav.hidden = true;
+  results.hidden = true;
+  setStatus("Putting together your readiness summary…");
+  try {
+    const fd = new FormData();
+    fd.append("jd", session.jd);
+    fd.append("context", session.context);
+    fd.append("answers", JSON.stringify(session.answers));
+    const r = await fetch("/api/interview/summary", { method: "POST", body: fd });
+    const sum = await r.json();
+    if (!r.ok) {
+      setStatus(sum.error || "Couldn't build the summary.", true);
+      return;
+    }
+    session.done = true;
+    summaryLevel.textContent = sum.level || "";
+    summaryText.textContent = sum.summary || "";
+    fillList(summaryStrengths, sum.strengths);
+    fillList(summaryImprovements, sum.improvements);
+    setStatus("");
+    layout();
+  } catch {
+    setStatus("Couldn't build the summary.", true);
+  }
+}
+
+restartInterviewBtn.addEventListener("click", () => {
+  session = null;
+  jdInput.value = "";
+  setStatus("");
+  layout();
 });
 
 recordBtn.addEventListener("click", async () => {
@@ -155,10 +283,11 @@ function stopTimer() {
 async function analyze(blob) {
   setStatus("Analyzing your speech…");
   recordBtn.disabled = true;
+  const inSession = isInterview() && session && !session.done;
   const fd = new FormData();
   fd.append("audio", blob, "recording.webm");
-  fd.append("prompt", promptInput.value.trim());
-  fd.append("context", buildContext());
+  fd.append("prompt", inSession ? session.questions[session.index] : promptInput.value.trim());
+  fd.append("context", inSession ? session.context : buildContext());
   if (isInterview()) fd.append("interview", "1");
   try {
     const r = await fetch("/api/analyze", { method: "POST", body: fd });
@@ -166,6 +295,7 @@ async function analyze(blob) {
     if (!r.ok) { setStatus(data.error || "Analysis failed.", true); return; }
     render(data);
     setStatus("");
+    if (inSession) afterSessionAnswer(data);
   } catch {
     setStatus("Something went wrong contacting the server.", true);
   } finally {
@@ -253,3 +383,6 @@ function highlight(transcript, fillers) {
   }
   return html;
 }
+
+// Set initial screen visibility.
+layout();

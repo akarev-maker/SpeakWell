@@ -201,6 +201,55 @@ button.record.recording {
   font-size: 1.05rem;
 }
 
+/* Interview session */
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.75rem 1.6rem;
+}
+button.primary:hover { background: var(--accent-dark); }
+
+#interviewStart { display: flex; flex-direction: column; }
+#startInterviewBtn { align-self: center; margin-top: 1.3rem; }
+
+#interviewSession { margin: 1.75rem 0 0; }
+.q-progress {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.q-text {
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  line-height: 1.4;
+  margin: 0.5rem 0 0;
+}
+
+#sessionNav { display: flex; justify-content: center; margin-top: 1.5rem; }
+
+.summary-card {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 0.4rem 1.2rem 1.2rem;
+}
+.summary-level {
+  display: inline-block;
+  margin-top: 1rem;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.95rem;
+  border-radius: 999px;
+}
+.summary-card .feedback { background: transparent; padding: 0.85rem 0 0; }
+.summary-card .tips { padding-left: 1.1rem; }
+#restartInterviewBtn { margin-top: 1.3rem; }
+
 /* Status */
 .status {
   min-height: 1.4rem;
