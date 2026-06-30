@@ -32,3 +32,25 @@ def test_model_env_override(monkeypatch):
     finally:
         monkeypatch.delenv("GEMINI_MODEL", raising=False)
         importlib.reload(config)
+
+
+def test_retired_2_0_model_raises(monkeypatch):
+    import importlib
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.0-flash")
+    try:
+        with pytest.raises(RuntimeError, match="retired"):
+            importlib.reload(config)
+    finally:
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+        importlib.reload(config)
+
+
+def test_retired_1_5_model_raises(monkeypatch):
+    import importlib
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-1.5-flash")
+    try:
+        with pytest.raises(RuntimeError, match="audio-capable"):
+            importlib.reload(config)
+    finally:
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+        importlib.reload(config)
