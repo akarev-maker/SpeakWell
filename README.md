@@ -17,10 +17,28 @@ It coaches on four dimensions: **filler words**, **pace & pauses**,
 ## Setup
 
 1. Install ffmpeg (used to transcode your browser recording):
-   - macOS: `brew install ffmpeg`
-   - Debian/Ubuntu: `sudo apt install ffmpeg`
-2. Install Python deps (Python 3.11+):
+   - **macOS** (Homebrew): `brew install ffmpeg`
+   - **Windows** (winget): `winget install Gyan.FFmpeg` — or with Chocolatey:
+     `choco install ffmpeg`
+   - **Debian/Ubuntu**: `sudo apt install ffmpeg`
+   - **Fedora/RHEL**: `sudo dnf install ffmpeg`
+   - **Arch**: `sudo pacman -S ffmpeg`
+   - **Anything else**: grab a static build from
+     [ffmpeg.org/download](https://ffmpeg.org/download.html) and put `ffmpeg` on
+     your `PATH`.
+
+   Verify it's installed and on your `PATH`:
    ```
+   ffmpeg -version
+   ```
+2. Install Python deps (Python 3.11+). A virtual environment is recommended:
+   ```
+   # macOS / Linux
+   python3 -m venv .venv && source .venv/bin/activate
+
+   # Windows (PowerShell)
+   py -m venv .venv; .venv\Scripts\Activate.ps1
+
    pip install -r requirements.txt
    ```
 3. Copy `.env.example` to `.env` and add your Gemini API key:
