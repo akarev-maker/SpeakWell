@@ -2,7 +2,7 @@
 
 A local web app that coaches you on how well you speak. Record yourself in the
 browser and get per-dimension scores, a transcript with filler words
-highlighted, and written coaching feedback — powered by Google Gemini 2.0 Flash.
+highlighted, and written coaching feedback — powered by Google Gemini.
 
 It coaches on four dimensions: **filler words**, **pace & pauses**,
 **clarity & structure**, and **confidence & tone**.
@@ -38,8 +38,8 @@ It coaches on four dimensions: **filler words**, **pace & pauses**,
 - The browser captures your microphone with the MediaRecorder API and POSTs the
   audio to `POST /api/analyze`.
 - The backend transcodes the audio to WAV with ffmpeg and sends it to Gemini
-  2.0 Flash, which returns scores, a transcript, detected filler words, and
-  coaching feedback as JSON.
+  (the model is configurable via `.env`), which returns scores, a transcript,
+  detected filler words, and coaching feedback as JSON.
 - `GET /api/prompt` returns an optional speaking prompt if you want one.
 - The app is stateless — nothing is saved between sessions.
 
