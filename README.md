@@ -7,6 +7,13 @@ highlighted, and written coaching feedback — powered by Google Gemini 2.0 Flas
 It coaches on four dimensions: **filler words**, **pace & pauses**,
 **clarity & structure**, and **confidence & tone**.
 
+> **Bring your own API key.** SpeakWell is self-hosted and ships with no key of
+> its own. You run it locally and supply your own [Google Gemini API
+> key](https://aistudio.google.com/apikey) (free tier works). Your key lives only
+> in a local `.env` file that is git-ignored and never leaves your machine; audio
+> is sent straight from your server to Google and nothing is stored between
+> sessions.
+
 ## Setup
 
 1. Install ffmpeg (used to transcode your browser recording):
