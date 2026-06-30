@@ -37,9 +37,12 @@ It coaches on four dimensions: **filler words**, **pace & pauses**,
 
 - The browser captures your microphone with the MediaRecorder API and POSTs the
   audio to `POST /api/analyze`.
-- The backend transcodes the audio to WAV with ffmpeg and sends it to Gemini
-  (the model is configurable via `.env`), which returns scores, a transcript,
-  detected filler words, and coaching feedback as JSON.
+- The backend transcodes the audio to WAV with ffmpeg and sends it to Gemini,
+  which returns scores, a transcript, detected filler words, and coaching
+  feedback as JSON. The model defaults to `gemini-3.1-flash-lite` and is
+  configurable via `GEMINI_MODEL` in `.env` — but it **must be an audio-capable
+  Gemini model** (e.g. `gemini-3.1-flash-lite` or `gemini-2.5-flash`). Retired
+  models like `gemini-2.0-flash` will not work.
 - `GET /api/prompt` returns an optional speaking prompt if you want one.
 - The app is stateless — nothing is saved between sessions.
 
