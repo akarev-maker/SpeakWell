@@ -1,6 +1,10 @@
 # tests/test_main.py
+import asyncio
 import io
 import json
+import time
+
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -277,6 +281,63 @@ def test_analyze_saves_session(client, monkeypatch):
     assert rows[0]["label"] == "Tell me about yourself"
 
 
+def test_analyze_does_not_block_the_event_loop(monkeypatch):
+    # /api/analyze must be async to read the upload, so its blocking work
+    # (ffmpeg, the Gemini call) has to be handed to a worker thread. Run
+    # directly on the loop it would freeze every other request for its whole
+    # duration — this asserts a concurrent request still gets served promptly.
+    blocking_sec = 0.6
+
+    def slow_transcode(raw):
+        time.sleep(blocking_sec)  # stands in for ffmpeg
+        return b"WAV"
+
+    fake = {
+        "scores": {"filler_words": 70, "pace_pauses": 80,
+                   "clarity_structure": 75, "confidence_tone": 78},
+        "transcript": "hi", "filler_words": [], "feedback": "ok", "tips": ["x"],
+    }
+    monkeypatch.setattr(main.audio, "transcode_to_wav", slow_transcode)
+    monkeypatch.setattr(
+        main.gemini_client, "analyze_speech",
+        lambda b, prompt=None, context=None, question=None: fake,
+    )
+
+    async def scenario():
+        transport = httpx.ASGITransport(app=main.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as ac:
+            start = time.monotonic()
+            done = {}
+
+            async def run_analyze():
+                r = await ac.post(
+                    "/api/analyze",
+                    files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
+                )
+                done["analyze"] = time.monotonic() - start
+                return r
+
+            async def run_progress():
+                await asyncio.sleep(0.05)  # queue up just after analyze begins
+                r = await ac.get("/api/progress")
+                done["progress"] = time.monotonic() - start
+                return r
+
+            # Timed from a fixed start, not from after the blocking call: a
+            # blocked loop delays run_progress from even beginning, so only an
+            # absolute clock catches it.
+            analyzed, progressed = await asyncio.gather(run_analyze(), run_progress())
+            return analyzed.status_code, progressed.status_code, done
+
+    analyze_status, progress_status, done = asyncio.run(scenario())
+    assert analyze_status == 200
+    assert progress_status == 200
+    assert done["progress"] < blocking_sec / 2, (
+        f"/api/progress only finished at {done['progress']:.2f}s "
+        f"(analysis took {done['analyze']:.2f}s) — the event loop is blocked"
+    )
+
+
 def test_progress_endpoint(client):
     resp = client.get("/api/progress")
     assert resp.status_code == 200
@@ -305,14 +366,82 @@ def test_analyze_handles_backend_error(client, monkeypatch):
     assert "gemini down" in resp.json()["error"]
 
 
-def test_analyze_handles_non_runtime_error(client, monkeypatch):
+def test_analyze_unexpected_error_is_not_leaked(client, monkeypatch):
+    # RuntimeError carries messages this codebase wrote for the user; anything
+    # else is an internal detail (SDK internals, subprocess output) and must not
+    # reach the browser.
     monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
     def boom(b, prompt=None, context=None, question=None):
-        raise ValueError("api boom")
+        raise ValueError("api boom: key=sk-secret at /srv/app/internals.py")
     monkeypatch.setattr(main.gemini_client, "analyze_speech", boom)
     resp = client.post(
         "/api/analyze",
         files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
     )
     assert resp.status_code == 500
-    assert "api boom" in resp.json()["error"]
+    assert "sk-secret" not in resp.json()["error"]
+    assert "internals.py" not in resp.json()["error"]
+    assert resp.json()["error"] == main.GENERIC_ERROR
+
+
+def test_cross_site_post_is_blocked(client):
+    resp = client.post(
+        "/api/prompt",
+        data={"context": "x"},
+        headers={"Origin": "https://evil.example"},
+    )
+    assert resp.status_code == 403
+
+
+def test_same_origin_post_is_allowed(client):
+    resp = client.post(
+        "/api/prompt", headers={"Origin": "http://testserver"}
+    )
+    assert resp.status_code == 200
+
+
+def test_oversized_content_length_rejected_before_read(client, monkeypatch):
+    # The body is never parsed: the declared length alone is enough to refuse.
+    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
+    resp = client.post(
+        "/api/analyze",
+        content=b"x" * 100,
+        headers={
+            "Content-Type": "multipart/form-data; boundary=x",
+            "Content-Length": str(main.MAX_REQUEST_BYTES + 1),
+        },
+    )
+    assert resp.status_code == 413
+
+
+def test_summary_rejects_malformed_answers(client):
+    resp = client.post("/api/interview/summary", data={"answers": "not json"})
+    assert resp.status_code == 400
+    resp = client.post("/api/interview/summary", data={"answers": '{"a": 1}'})
+    assert resp.status_code == 400
+
+
+def test_summary_ignores_non_object_entries(client, monkeypatch):
+    captured = {}
+
+    def fake_sum(ctx, qa):
+        captured["qa"] = qa
+        return {"level": "ok", "summary": "s", "strengths": [], "improvements": []}
+
+    monkeypatch.setattr(main.gemini_client, "summarize_interview", fake_sum)
+    resp = client.post(
+        "/api/interview/summary",
+        data={"answers": json.dumps(["junk", {"question": "q", "answer": "a"}])},
+    )
+    assert resp.status_code == 200
+    assert captured["qa"] == [{"question": "q", "answer": "a"}]
+
+
+def test_long_text_fields_are_truncated(client, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        main.gemini_client, "generate_prompt",
+        lambda c: captured.setdefault("ctx", c) or "p",
+    )
+    client.post("/api/prompt", data={"context": "a" * (main.MAX_TEXT_CHARS + 500)})
+    assert len(captured["ctx"]) == main.MAX_TEXT_CHARS

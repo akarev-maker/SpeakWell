@@ -200,6 +200,9 @@ async function startInterview() {
 startInterviewBtn.addEventListener("click", startInterview);
 
 async function afterSessionAnswer(data) {
+  // The analysis may have been in flight while the user switched modes or hit
+  // "Start over", both of which clear the session out from under us.
+  if (!session || session.done) return;
   const transcript = data.transcript || "";
   session.answers.push({ question: session.currentQuestion, answer: transcript });
   const last = session.index === session.questions.length - 1;
@@ -250,7 +253,7 @@ async function finishInterview() {
     const r = await fetch("/api/interview/summary", { method: "POST", body: fd });
     const sum = await r.json();
     if (!r.ok) {
-      setStatus(sum.error || "Couldn't build the summary.", true);
+      failSummary(sum.error);
       return;
     }
     session.done = true;
@@ -261,8 +264,16 @@ async function finishInterview() {
     setStatus("");
     layout();
   } catch {
-    setStatus("Couldn't build the summary.", true);
+    failSummary();
   }
+}
+
+// Put the nav button back so a failed summary is retryable — without it the
+// user is left on a screen with no results and no way forward.
+function failSummary(message) {
+  setStatus(message || "Couldn't build the summary. Try again.", true);
+  nextQuestionBtn.textContent = "Finish & see summary";
+  sessionNav.hidden = false;
 }
 
 restartInterviewBtn.addEventListener("click", () => {
@@ -369,11 +380,18 @@ function colorFor(v) {
   return v >= 75 ? "var(--good)" : v >= 50 ? "var(--mid)" : "var(--bad)";
 }
 
+// Scores come from the model, so never trust them to be in range: an unclamped
+// value would render a bar wider than its track and a nonsense number.
+function clampScore(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
+}
+
 function render(data) {
   scoresEl.innerHTML = "";
   const reasons = data.score_reasons || {};
   for (const [key, label] of Object.entries(SCORE_LABELS)) {
-    const v = Number(data.scores[key]);
+    const v = clampScore((data.scores || {})[key]);
     const reason = reasons[key] || "";
     const card = document.createElement("div");
     card.className = "score-card";
@@ -422,14 +440,18 @@ function escapeHtml(s) {
 }
 
 function highlight(transcript, fillers) {
-  let html = escapeHtml(transcript);
-  const uniq = [...new Set(fillers.filter(Boolean))];
-  for (const f of uniq) {
-    const esc = escapeHtml(f).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    html = html.replace(new RegExp(`\\b${esc}\\b`, "gi"),
-      (m) => `<span class="filler">${m}</span>`);
-  }
-  return html;
+  const html = escapeHtml(transcript || "");
+  const uniq = [...new Set((fillers || []).filter(Boolean))];
+  if (!uniq.length) return html;
+  // One combined pass. Replacing word by word would rescan the <span> markup
+  // inserted by earlier rounds, so a filler like "span" or "class" corrupted
+  // the output. Longest-first so overlapping fillers match the fuller phrase.
+  const alt = uniq
+    .map((f) => escapeHtml(f).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .sort((a, b) => b.length - a.length)
+    .join("|");
+  return html.replace(new RegExp(`\\b(?:${alt})\\b`, "gi"),
+    (m) => `<span class="filler">${m}</span>`);
 }
 
 // ----- Progress view -----
@@ -471,7 +493,7 @@ function renderProgress(sessions) {
   const chrono = sessions.slice().reverse(); // oldest -> newest
   let cards = "";
   for (const [key, label] of PROGRESS_DIMS) {
-    const vals = chrono.map((s) => s[key]).filter((v) => v != null);
+    const vals = chrono.map((s) => s[key]).filter((v) => v != null).map(clampScore);
     if (!vals.length) continue;
     const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
     const first = vals[0], last = vals[vals.length - 1];
@@ -488,11 +510,15 @@ function renderProgress(sessions) {
     const d = new Date(s.created_at);
     const when = isNaN(d.getTime()) ? "" :
       `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    const mode = escapeHtml(s.mode || "");
+    const cells = PROGRESS_DIMS
+      .map(([key]) => (s[key] == null ? "–" : clampScore(s[key])))
+      .join(" · ");
     hist +=
       `<li><span class="h-when">${when}</span>` +
-      `<span class="h-mode ${s.mode}">${s.mode}</span>` +
+      `<span class="h-mode ${mode}">${mode}</span>` +
       `<span class="h-label">${escapeHtml(s.label || "")}</span>` +
-      `<span class="h-scores">${s.filler_words} · ${s.pace_pauses} · ${s.clarity_structure} · ${s.confidence_tone}</span></li>`;
+      `<span class="h-scores">${cells}</span></li>`;
   }
   progressView.innerHTML =
     `<div class="progress-head"><button id="backBtn" class="secondary">← Back</button>` +
