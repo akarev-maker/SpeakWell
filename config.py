@@ -30,6 +30,10 @@ GEMINI_MODEL = _validate_model(
     os.environ.get("GEMINI_MODEL", "").strip() or "gemini-3.1-flash-lite"
 )
 
+# Upper bound on a single Gemini call, in milliseconds. Without it a hung
+# request would tie up a worker thread indefinitely.
+GEMINI_TIMEOUT_MS = 120_000
+
 
 def get_api_key() -> str:
     key = os.environ.get("GEMINI_API_KEY", "").strip()

@@ -33,3 +33,23 @@ def test_recent_respects_limit(tmp_path, monkeypatch):
 def test_recent_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DB_PATH", str(tmp_path / "t.db"))
     assert storage.recent_sessions() == []
+
+
+def test_out_of_range_and_junk_scores_are_normalized(tmp_path, monkeypatch):
+    # Scores come from the model, so they are not trusted to be sane integers.
+    monkeypatch.setattr(storage, "DB_PATH", str(tmp_path / "t.db"))
+    storage.save_session("practice", "q", {
+        "filler_words": 150, "pace_pauses": -20,
+        "clarity_structure": "not a number", "confidence_tone": None,
+    })
+    row = storage.recent_sessions(1)[0]
+    assert row["filler_words"] == 100
+    assert row["pace_pauses"] == 0
+    assert row["clarity_structure"] is None
+    assert row["confidence_tone"] is None
+
+
+def test_db_path_is_absolute_by_default():
+    # Independent of the process working directory.
+    from pathlib import Path
+    assert Path(storage.DB_PATH).is_absolute()

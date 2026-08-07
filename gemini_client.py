@@ -1,4 +1,6 @@
+import functools
 import json
+
 from google import genai
 from google.genai import types
 
@@ -121,8 +123,18 @@ PROMPT_INSTRUCTION = (
 )
 
 
+@functools.lru_cache(maxsize=1)
+def _client_for(api_key: str) -> genai.Client:
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(timeout=config.GEMINI_TIMEOUT_MS),
+    )
+
+
 def _build_client() -> genai.Client:
-    return genai.Client(api_key=config.get_api_key())
+    # Cached per key: each Client builds its own connection pool, so making a
+    # fresh one per request throws away every kept-alive connection.
+    return _client_for(config.get_api_key())
 
 
 def generate_prompt(context: str) -> str:

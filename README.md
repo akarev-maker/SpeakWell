@@ -62,7 +62,7 @@ It coaches on four dimensions: **filler words**, **pace & pauses**,
    ```
    GEMINI_API_KEY=your_key_here
    ```
-4. Run the server from the project root:
+4. Run the server:
    ```
    python -m uvicorn main:app --reload
    ```
@@ -86,8 +86,10 @@ It coaches on four dimensions: **filler words**, **pace & pauses**,
 
 ## Privacy & your data
 
-- **Your audio is never stored.** It is transcoded in memory and sent to Google
-  for analysis — nothing is written to disk on your server.
+- **Your audio is never stored.** It is held in memory, transcoded in memory
+  (piped through ffmpeg, never via a temp file), and sent to Google for
+  analysis — nothing is written to disk on your server. Uploads are capped at
+  25 MB so holding them in memory stays bounded.
 - **Your scores are stored locally.** SpeakWell saves the four numeric scores
   (plus a short label and timestamp) for each session to a `speakwell.db`
   SQLite file in the project folder, purely to power the Progress view. That
@@ -95,6 +97,11 @@ It coaches on four dimensions: **filler words**, **pace & pauses**,
 - **Your API key stays local.** It lives only in your git-ignored `.env`.
 - Where your audio goes from Google is governed by
   [Google's Gemini API terms](https://ai.google.dev/gemini-api/terms).
+- **SpeakWell has no authentication.** It is built to listen on `127.0.0.1`,
+  where only you can reach it. Cross-site requests are rejected, so a page you
+  visit in another tab can't drive it — but don't expose it to a network
+  (`--host 0.0.0.0`, a tunnel, a reverse proxy) without putting auth in front,
+  or anyone who can reach it can spend your API quota and read your history.
 
 ## Tests
 
