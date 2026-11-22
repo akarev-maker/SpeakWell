@@ -3,140 +3,189 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SpeakWell — Speech Coach</title>
+  <title>SpeakWell — Mock interviews</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%233f7d5a%22/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <main class="container">
-    <header>
-      <h1>SpeakWell</h1>
-      <p class="tagline">Speak. Reflect. Improve.</p>
-      <button id="progressLink" class="progress-link" type="button">📈 Progress</button>
-    </header>
-
-    <div id="appMain">
-    <div class="mode-switch" id="modeSwitch" role="tablist" aria-label="Mode">
-      <span class="mode-thumb" aria-hidden="true"></span>
-      <button type="button" class="mode-option is-active" data-mode="practice" role="tab" aria-selected="true">Practice</button>
-      <button type="button" class="mode-option" data-mode="interview" role="tab" aria-selected="false">Mock interview</button>
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>SpeakWell</span>
+    </a>
+    <nav class="nav" id="nav">
+      <a href="#/" data-route="home">Interview</a>
+      <a href="#/history" data-route="history">History</a>
+      <a href="#/resume" data-route="resume">Resume</a>
+    </nav>
+    <div class="budget" id="budget" title="Estimated Gemini spend this month">
+      <span class="budget-label">This month</span>
+      <span class="budget-bar"><span id="budgetFill"></span></span>
+      <span class="budget-num" id="budgetNum">–</span>
     </div>
+  </header>
 
-    <section class="context-bar" id="contextBar">
-      <label for="contextSelect" class="prompt-label">Who are you / what's your goal? (optional)</label>
-      <select id="contextSelect" class="context-select">
-        <option value="">No specific context</option>
-        <option value="Giving a presentation or speaking in public">Presentations &amp; public speaking</option>
-        <option value="Communicating in meetings and at work">Meetings &amp; workplace communication</option>
-        <option value="Selling, pitching, or persuading an audience">Sales, pitching &amp; persuading</option>
-        <option value="Teaching, training, or explaining something to others">Teaching, training &amp; explaining</option>
-        <option value="Speaking on camera for a podcast, video, or media">On camera — podcasts / video / media</option>
-        <option value="Improving everyday social conversations">Everyday social conversations</option>
-        <option value="Speaking confidently while dating and making connections">Dating &amp; making connections</option>
-        <option value="Practicing speaking English as a second language">English as a second language</option>
-        <option value="">Other — describe below ↓</option>
-      </select>
-      <textarea id="contextDetail" class="prompt-input" rows="2"
-        placeholder="Add specifics (optional), e.g. ‘I get nervous and talk too fast in interviews.’"></textarea>
-    </section>
-
-    <div id="interviewStart" hidden>
-      <section class="context-bar">
-        <label for="jdInput" class="prompt-label">Paste the job description</label>
-        <textarea id="jdInput" class="prompt-input" rows="5"
-          placeholder="Paste the job posting here — your questions will be tailored to it…"></textarea>
-      </section>
-
-      <section class="context-bar" id="interviewContext">
-        <label for="roleSelect" class="prompt-label">No job description? Pick a role</label>
-        <select id="roleSelect" class="context-select">
-          <option value="">No specific role</option>
-          <option value="an internship">Internship</option>
-          <option value="an entry-level / new-grad role">Entry-level / new grad</option>
-          <option value="a software engineer role">Software engineer</option>
-          <option value="a senior software engineer role">Senior software engineer</option>
-          <option value="a product manager role">Product manager</option>
-          <option value="a data analyst or data scientist role">Data analyst / scientist</option>
-          <option value="a UX / UI designer role">Designer (UX / UI)</option>
-          <option value="a marketing role">Marketing</option>
-          <option value="a sales role">Sales</option>
-          <option value="a customer success or support role">Customer success / support</option>
-          <option value="a management consulting role (case interview)">Consulting (case interview)</option>
-          <option value="a finance or accounting role">Finance / accounting</option>
-          <option value="a management or leadership role">Manager / leadership</option>
-          <option value="a nursing or healthcare role">Nurse / healthcare</option>
-          <option value="a teaching or education role">Teacher / education</option>
-          <option value="graduate school or university admission">Grad school / university admission</option>
-          <option value="a club or student organization">Club / student organization</option>
-          <option value="">Other — describe below ↓</option>
-        </select>
-        <textarea id="roleDetail" class="prompt-input" rows="2"
-          placeholder="Specific role (optional), e.g. ‘Senior Frontend Engineer at a fintech startup’"></textarea>
-      </section>
-
-      <button id="startInterviewBtn" class="primary">Start interview →</button>
-    </div>
-
-    <div id="interviewSession" hidden>
-      <div class="q-progress" id="qProgress"></div>
-      <p class="q-text" id="qText"></p>
-    </div>
-
-    <section class="prompt-bar" id="promptBar">
-      <label for="promptInput" class="prompt-label" id="promptLabel">Your speaking prompt (optional)</label>
-      <textarea id="promptInput" class="prompt-input" rows="2"
-        placeholder="Type your own prompt to speak about, or click ‘Give me a prompt’…"></textarea>
-      <button id="promptBtn" class="secondary">Give me a prompt</button>
-    </section>
-
-    <section class="recorder" id="recorder">
-      <button id="recordBtn" class="record">● Record</button>
-      <span id="timer" class="timer">0:00</span>
-    </section>
-
-    <p id="status" class="status" role="status"></p>
-
-    <section id="results" class="results" hidden>
-      <div id="recordingCard" class="recording-card" hidden>
-        <div class="recording-title">Your recording</div>
-        <audio id="player" class="player" controls></audio>
-        <div id="pace" class="pace" hidden></div>
+  <main id="app">
+    <!-- ========== Setup ========== -->
+    <section class="view" id="view-home" hidden>
+      <div class="hero">
+        <h1>Practice the real thing.</h1>
+        <p class="lede">A spoken mock interview with an AI interviewer who leads, probes, and cuts you off
+          when you ramble. Take as long as you need to think. No feedback until it's over, just like the real one.</p>
       </div>
-      <div class="scores" id="scores"></div>
-      <div id="interviewCard" class="interview-card" hidden>
-        <h2>Interview answer</h2>
-        <div class="interview-sub">How you answered</div>
-        <p id="answerCritique" class="feedback"></p>
-        <div class="interview-sub">A stronger answer</div>
-        <p id="modelAnswer" class="feedback"></p>
+
+      <div class="setup">
+        <div class="field">
+          <div class="field-label">Interview</div>
+          <div class="kind-grid" id="kindGrid"></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label">Track</div>
+            <div class="seg" id="trackSeg"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Level</div>
+            <div class="seg" id="levelSeg"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Interviewer style</div>
+          <div class="seg" id="personaSeg"></div>
+        </div>
+
+        <div class="resume-warning" id="resumeWarning" hidden>
+          The resume deep dive needs your resume. <a href="#/resume">Add it first →</a>
+        </div>
+
+        <div class="start-row">
+          <button class="btn primary big" id="startBtn">Start interview</button>
+          <p class="hint">Chrome · find a quiet spot · press to talk, take your time</p>
+        </div>
+        <p class="error-text" id="setupError" role="alert"></p>
       </div>
-      <h2>Transcript</h2>
-      <p id="transcript" class="transcript"></p>
-      <h2>Coaching feedback</h2>
-      <p id="feedback" class="feedback"></p>
-      <h2>How to improve</h2>
-      <ul id="tips" class="tips"></ul>
     </section>
 
-    <div id="sessionNav" hidden>
-      <button id="nextQuestionBtn" class="primary">Next question →</button>
-    </div>
-
-    <section id="interviewSummary" class="results" hidden>
-      <h2>Interview readiness</h2>
-      <div class="summary-card">
-        <div class="summary-level" id="summaryLevel"></div>
-        <p class="feedback" id="summaryText"></p>
-        <div class="interview-sub">Strengths</div>
-        <ul id="summaryStrengths" class="tips"></ul>
-        <div class="interview-sub">Focus on</div>
-        <ul id="summaryImprovements" class="tips"></ul>
+    <!-- ========== Preparing / lobby ========== -->
+    <section class="view" id="view-prep" hidden>
+      <div class="prep">
+        <div class="orb orb-loading" aria-hidden="true"><span></span></div>
+        <div id="prepLoading">
+          <h2>Starting up interview…</h2>
+          <p class="prep-step" id="prepStep">Picking a topic</p>
+          <p class="muted small">This takes up to a minute: the whole interview is planned before it starts.</p>
+        </div>
+        <div id="prepReady" hidden>
+          <h2 id="lobbyTitle"></h2>
+          <p class="lobby-meta" id="lobbyMeta"></p>
+          <div class="mic-check">
+            <span class="mic-check-label" id="micLabel">Checking your microphone…</span>
+            <span class="meter"><span id="micMeter"></span></span>
+          </div>
+          <button class="btn primary big" id="joinBtn" disabled>Join interview</button>
+          <button class="btn ghost" id="cancelPrepBtn">Cancel</button>
+        </div>
+        <p class="error-text" id="prepError" role="alert"></p>
       </div>
-      <button id="restartInterviewBtn" class="secondary">Start over</button>
     </section>
-    </div>
 
-    <section id="progressView" hidden></section>
+    <!-- ========== Interview room ========== -->
+    <section class="view room" id="view-room" hidden>
+      <div class="room-bar">
+        <div class="room-who">
+          <span class="live-dot" id="liveDot"></span>
+          <span id="roomName"></span>
+          <span class="muted" id="roomStatus">Connecting…</span>
+        </div>
+        <div class="room-clock" id="roomClock">0:00 <span class="muted">/ 45:00</span></div>
+        <div class="room-actions">
+          <button class="btn danger" id="endBtn">End interview</button>
+        </div>
+      </div>
+
+      <div class="room-body" id="roomBody">
+        <div class="stage">
+          <div class="orb" id="orb" aria-hidden="true"><span></span></div>
+          <div class="stage-label" id="stageLabel">Connecting</div>
+          <div class="captions" id="captions" aria-live="polite"></div>
+
+          <div class="answer-bar">
+            <p class="error-text" id="turnError" role="alert"></p>
+            <button class="btn" id="retryBtn" hidden>Retry</button>
+            <div class="answer-row" id="answerRow">
+              <button class="answer-btn" id="answerBtn" type="button" disabled>
+                <span class="answer-dot"></span><span id="answerLabel">Start answer</span>
+              </button>
+              <div class="answer-meta">
+                <span class="meter answer-meter"><span id="answerMeter"></span></span>
+                <span class="muted small" id="answerHint">Space or ⌘↵ to start and stop</span>
+              </div>
+            </div>
+            <div class="type-row" id="typeRow" hidden>
+              <input id="typeInput" type="text" maxlength="4000" placeholder="Type your answer and press Enter…" />
+              <button class="btn" id="typeSend">Send</button>
+            </div>
+            <button class="link-btn" id="typeToggle" type="button">Type instead</button>
+          </div>
+        </div>
+
+        <div class="workspace" id="workspace" hidden>
+          <div class="problem" id="problemPanel">
+            <div class="placeholder">The problem will appear here when your interviewer gets to it.</div>
+          </div>
+          <div class="editor-wrap" id="editorWrap" hidden>
+            <div class="editor-head"><span>solution.py</span><span class="muted">Python · not executed</span></div>
+            <div id="editor"></div>
+          </div>
+          <div class="notes-wrap" id="notesWrap" hidden>
+            <div class="editor-head"><span>Notes</span><span class="muted">Your interviewer can see these</span></div>
+            <textarea id="notes" spellcheck="false"
+              placeholder="Requirements, numbers, components, APIs, data model…&#10;&#10;- Functional:&#10;- Non-functional:&#10;- Scale:"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Grading ========== -->
+    <section class="view" id="view-grading" hidden>
+      <div class="prep">
+        <div class="orb orb-loading" aria-hidden="true"><span></span></div>
+        <h2>Grading your interview</h2>
+        <ol class="steps" id="gradeSteps">
+          <li data-stage="delivery">Listening to how you said it</li>
+          <li data-stage="grading">Scoring against the rubric</li>
+        </ol>
+        <p class="muted small">Usually under a minute.</p>
+        <p class="error-text" id="gradeError" role="alert"></p>
+        <button class="btn" id="gradeRetryBtn" hidden>Try grading again</button>
+      </div>
+    </section>
+
+    <!-- ========== Report ========== -->
+    <section class="view" id="view-report" hidden></section>
+
+    <!-- ========== History ========== -->
+    <section class="view" id="view-history" hidden></section>
+
+    <!-- ========== Resume ========== -->
+    <section class="view" id="view-resume" hidden>
+      <div class="page-head">
+        <h1>Your resume</h1>
+        <p class="lede">Paste it as plain text. The resume deep dive picks your strongest projects from it
+          and drills into them. It's saved only on this computer.</p>
+      </div>
+      <textarea id="resumeText" class="resume-text" spellcheck="false"
+        placeholder="Paste your resume here…"></textarea>
+      <div class="resume-actions">
+        <button class="btn primary" id="resumeSave">Save resume</button>
+        <button class="btn ghost" id="resumeClear">Clear</button>
+        <span class="muted small" id="resumeStatus"></span>
+      </div>
+    </section>
   </main>
-  <script src="/static/app.js"></script>
+
+  <script type="module" src="/static/app.js"></script>
 </body>
 </html>

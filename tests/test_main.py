@@ -1,447 +1,202 @@
-# tests/test_main.py
-import asyncio
-import io
-import json
 import time
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+import grading
 import main
+import models
+import planner
+import session as sessions
 import storage
-
-
-@pytest.fixture(autouse=True)
-def temp_db(tmp_path, monkeypatch):
-    # Point the history DB at a throwaway file so tests never touch speakwell.db.
-    monkeypatch.setattr(storage, "DB_PATH", str(tmp_path / "test.db"))
+from tests.helpers import make_plan, make_session
 
 
 @pytest.fixture
 def client():
+    sessions._sessions.clear()
     return TestClient(main.app)
 
 
-def test_prompt_endpoint_no_context_is_random(client):
-    resp = client.post("/api/prompt")
-    assert resp.status_code == 200
-    assert isinstance(resp.json()["prompt"], str)
-    assert resp.json()["prompt"]
-
-
-def test_prompt_tailored_to_context(client, monkeypatch):
-    monkeypatch.setattr(
-        main.gemini_client, "generate_prompt", lambda c: f"Tailored for: {c}"
-    )
-    resp = client.post("/api/prompt", data={"context": "Sales pitching"})
-    assert resp.status_code == 200
-    assert resp.json()["prompt"] == "Tailored for: Sales pitching"
-
-
-def test_prompt_falls_back_when_generation_fails(client, monkeypatch):
-    def boom(c):
-        raise RuntimeError("gemini down")
-    monkeypatch.setattr(main.gemini_client, "generate_prompt", boom)
-    resp = client.post("/api/prompt", data={"context": "Sales pitching"})
-    assert resp.status_code == 200
-    assert resp.json()["prompt"]  # a fallback random prompt
-
-
-def test_interview_start_from_jd(client, monkeypatch):
-    captured = {}
-
-    def fake_gen(ctx):
-        captured["ctx"] = ctx
-        return ["Q1?", "Q2?"]
-
-    monkeypatch.setattr(main.gemini_client, "generate_interview_questions", fake_gen)
-    resp = client.post(
-        "/api/interview/start",
-        data={"jd": "Backend engineer at a payments company"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["questions"] == ["Q1?", "Q2?"]
-    assert "payments" in captured["ctx"]
-
-
-def test_interview_start_falls_back(client, monkeypatch):
-    def boom(ctx):
-        raise RuntimeError("down")
-
-    monkeypatch.setattr(main.gemini_client, "generate_interview_questions", boom)
-    resp = client.post("/api/interview/start", data={"jd": "anything"})
-    assert resp.status_code == 200
-    assert len(resp.json()["questions"]) >= 1  # built-in fallback set
-
-
-def test_interview_followup(client, monkeypatch):
-    monkeypatch.setattr(
-        main.gemini_client, "generate_followup", lambda c, q, a: f"FU:{a}"
-    )
-    resp = client.post(
-        "/api/interview/followup",
-        data={"context": "x", "question": "q", "answer": "my answer"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["followup"] == "FU:my answer"
-
-
-def test_interview_followup_empty_on_error(client, monkeypatch):
-    def boom(c, q, a):
-        raise RuntimeError("down")
-
-    monkeypatch.setattr(main.gemini_client, "generate_followup", boom)
-    resp = client.post(
-        "/api/interview/followup",
-        data={"context": "x", "question": "q", "answer": "a"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["followup"] == ""
-
-
-def test_interview_summary(client, monkeypatch):
-    captured = {}
-
-    def fake_sum(ctx, qa):
-        captured["qa"] = qa
-        return {"level": "Getting there", "summary": "ok",
-                "strengths": ["a"], "improvements": ["b"]}
-
-    monkeypatch.setattr(main.gemini_client, "summarize_interview", fake_sum)
-    resp = client.post(
-        "/api/interview/summary",
-        data={
-            "jd": "SWE role",
-            "answers": json.dumps([{"question": "Q1?", "answer": "my answer"}]),
-        },
-    )
-    assert resp.status_code == 200
-    assert resp.json()["level"] == "Getting there"
-    assert captured["qa"] == [{"question": "Q1?", "answer": "my answer"}]
-
-
-def test_interview_summary_handles_error(client, monkeypatch):
-    def boom(ctx, qa):
-        raise RuntimeError("summary down")
-
-    monkeypatch.setattr(main.gemini_client, "summarize_interview", boom)
-    resp = client.post(
-        "/api/interview/summary",
-        data={"answers": json.dumps([{"question": "q", "answer": "a"}])},
-    )
-    assert resp.status_code == 500
-    assert "error" in resp.json()
-
-
-def test_analyze_interview_forwards_question_and_returns_extra(client, monkeypatch):
-    captured = {}
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    fake = {
-        "scores": {"filler_words": 70, "pace_pauses": 80,
-                   "clarity_structure": 75, "confidence_tone": 78},
-        "transcript": "hi", "filler_words": [], "feedback": "Nice.", "tips": ["x"],
-        "answer_critique": "Decent.", "model_answer": "Better answer here.",
-    }
-
-    def fake_analyze(b, prompt=None, context=None, question=None):
-        captured["question"] = question
-        captured["prompt"] = prompt
-        return fake
-
-    monkeypatch.setattr(main.gemini_client, "analyze_speech", fake_analyze)
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-        data={"prompt": "Why do you want this job?", "interview": "1"},
-    )
-    assert resp.status_code == 200
-    assert captured["question"] == "Why do you want this job?"
-    assert captured["prompt"] is None  # not double-passed as a speech prompt
-    assert resp.json()["model_answer"] == "Better answer here."
-
-
-def test_analyze_success(client, monkeypatch):
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    fake = {
-        "scores": {"filler_words": 70, "pace_pauses": 80,
-                   "clarity_structure": 75, "confidence_tone": 78},
-        "transcript": "hello world", "filler_words": [], "feedback": "Nice.",
-    }
-    monkeypatch.setattr(
-        main.gemini_client, "analyze_speech", lambda b, prompt=None, context=None, question=None: fake
-    )
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["scores"]["pace_pauses"] == 80
-
-
-def test_analyze_forwards_prompt(client, monkeypatch):
-    captured = {}
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    fake = {
-        "scores": {"filler_words": 70, "pace_pauses": 80,
-                   "clarity_structure": 75, "confidence_tone": 78},
-        "transcript": "hello", "filler_words": [], "feedback": "Nice.",
-    }
-
-    def fake_analyze(b, prompt=None, context=None, question=None):
-        captured["prompt"] = prompt
-        return fake
-
-    monkeypatch.setattr(main.gemini_client, "analyze_speech", fake_analyze)
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-        data={"prompt": "Describe your ideal weekend."},
-    )
-    assert resp.status_code == 200
-    assert captured["prompt"] == "Describe your ideal weekend."
-
-
-def test_analyze_forwards_context(client, monkeypatch):
-    captured = {}
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    fake = {
-        "scores": {"filler_words": 70, "pace_pauses": 80,
-                   "clarity_structure": 75, "confidence_tone": 78},
-        "transcript": "hi", "filler_words": [], "feedback": "Nice.", "tips": ["x"],
-    }
-
-    def fake_analyze(b, prompt=None, context=None, question=None):
-        captured["context"] = context
-        return fake
-
-    monkeypatch.setattr(main.gemini_client, "analyze_speech", fake_analyze)
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-        data={"context": "Junior developer, interview prep"},
-    )
-    assert resp.status_code == 200
-    assert captured["context"] == "Junior developer, interview prep"
-
-
-def test_analyze_blank_prompt_becomes_none(client, monkeypatch):
-    captured = {}
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    fake = {
-        "scores": {"filler_words": 70, "pace_pauses": 80,
-                   "clarity_structure": 75, "confidence_tone": 78},
-        "transcript": "hello", "filler_words": [], "feedback": "Nice.",
-    }
-
-    def fake_analyze(b, prompt=None, context=None, question=None):
-        captured["prompt"] = prompt
-        return fake
-
-    monkeypatch.setattr(main.gemini_client, "analyze_speech", fake_analyze)
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-        data={"prompt": "   "},
-    )
-    assert resp.status_code == 200
-    assert captured["prompt"] is None
-
-
-def test_analyze_rejects_oversized_audio(client, monkeypatch):
-    monkeypatch.setattr(main, "MAX_AUDIO_BYTES", 2000)
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 3000), "audio/webm")},
-    )
-    assert resp.status_code == 413
-    assert "error" in resp.json()
-
-
-def test_analyze_saves_session(client, monkeypatch):
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    fake = {
-        "scores": {"filler_words": 70, "pace_pauses": 80,
-                   "clarity_structure": 75, "confidence_tone": 78},
-        "transcript": "hi", "filler_words": [], "feedback": "ok", "tips": ["x"],
-    }
-    monkeypatch.setattr(
-        main.gemini_client, "analyze_speech",
-        lambda b, prompt=None, context=None, question=None: fake,
-    )
-    client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-        data={"prompt": "Tell me about yourself"},
-    )
-    rows = storage.recent_sessions(10)
-    assert len(rows) == 1
-    assert rows[0]["mode"] == "practice"
-    assert rows[0]["filler_words"] == 70
-    assert rows[0]["label"] == "Tell me about yourself"
-
-
-def test_analyze_does_not_block_the_event_loop(monkeypatch):
-    # /api/analyze must be async to read the upload, so its blocking work
-    # (ffmpeg, the Gemini call) has to be handed to a worker thread. Run
-    # directly on the loop it would freeze every other request for its whole
-    # duration — this asserts a concurrent request still gets served promptly.
-    blocking_sec = 0.6
-
-    def slow_transcode(raw):
-        time.sleep(blocking_sec)  # stands in for ffmpeg
-        return b"WAV"
-
-    fake = {
-        "scores": {"filler_words": 70, "pace_pauses": 80,
-                   "clarity_structure": 75, "confidence_tone": 78},
-        "transcript": "hi", "filler_words": [], "feedback": "ok", "tips": ["x"],
-    }
-    monkeypatch.setattr(main.audio, "transcode_to_wav", slow_transcode)
-    monkeypatch.setattr(
-        main.gemini_client, "analyze_speech",
-        lambda b, prompt=None, context=None, question=None: fake,
-    )
-
-    async def scenario():
-        transport = httpx.ASGITransport(app=main.app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://t") as ac:
-            start = time.monotonic()
-            done = {}
-
-            async def run_analyze():
-                r = await ac.post(
-                    "/api/analyze",
-                    files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-                )
-                done["analyze"] = time.monotonic() - start
-                return r
-
-            async def run_progress():
-                await asyncio.sleep(0.05)  # queue up just after analyze begins
-                r = await ac.get("/api/progress")
-                done["progress"] = time.monotonic() - start
-                return r
-
-            # Timed from a fixed start, not from after the blocking call: a
-            # blocked loop delays run_progress from even beginning, so only an
-            # absolute clock catches it.
-            analyzed, progressed = await asyncio.gather(run_analyze(), run_progress())
-            return analyzed.status_code, progressed.status_code, done
-
-    analyze_status, progress_status, done = asyncio.run(scenario())
-    assert analyze_status == 200
-    assert progress_status == 200
-    assert done["progress"] < blocking_sec / 2, (
-        f"/api/progress only finished at {done['progress']:.2f}s "
-        f"(analysis took {done['analyze']:.2f}s) — the event loop is blocked"
-    )
-
-
-def test_progress_endpoint(client):
-    resp = client.get("/api/progress")
-    assert resp.status_code == 200
-    assert resp.json()["sessions"] == []
-
-
-def test_analyze_empty_audio_rejected(client):
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b""), "audio/webm")},
-    )
-    assert resp.status_code == 400
-    assert "error" in resp.json()
-
-
-def test_analyze_handles_backend_error(client, monkeypatch):
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    def boom(b, prompt=None, context=None, question=None):
-        raise RuntimeError("gemini down")
-    monkeypatch.setattr(main.gemini_client, "analyze_speech", boom)
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-    )
-    assert resp.status_code == 500
-    assert "gemini down" in resp.json()["error"]
-
-
-def test_analyze_unexpected_error_is_not_leaked(client, monkeypatch):
-    # RuntimeError carries messages this codebase wrote for the user; anything
-    # else is an internal detail (SDK internals, subprocess output) and must not
-    # reach the browser.
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    def boom(b, prompt=None, context=None, question=None):
-        raise ValueError("api boom: key=sk-secret at /srv/app/internals.py")
-    monkeypatch.setattr(main.gemini_client, "analyze_speech", boom)
-    resp = client.post(
-        "/api/analyze",
-        files={"audio": ("rec.webm", io.BytesIO(b"x" * 1500), "audio/webm")},
-    )
-    assert resp.status_code == 500
-    assert "sk-secret" not in resp.json()["error"]
-    assert "internals.py" not in resp.json()["error"]
-    assert resp.json()["error"] == main.GENERIC_ERROR
-
-
-def test_cross_site_post_is_blocked(client):
-    resp = client.post(
-        "/api/prompt",
-        data={"context": "x"},
-        headers={"Origin": "https://evil.example"},
-    )
-    assert resp.status_code == 403
-
-
-def test_same_origin_post_is_allowed(client):
-    resp = client.post(
-        "/api/prompt", headers={"Origin": "http://testserver"}
-    )
-    assert resp.status_code == 200
-
-
-def test_oversized_content_length_rejected_before_read(client, monkeypatch):
-    # The body is never parsed: the declared length alone is enough to refuse.
-    monkeypatch.setattr(main.audio, "transcode_to_wav", lambda b: b"WAV")
-    resp = client.post(
-        "/api/analyze",
-        content=b"x" * 100,
-        headers={
-            "Content-Type": "multipart/form-data; boundary=x",
-            "Content-Length": str(main.MAX_REQUEST_BYTES + 1),
-        },
-    )
-    assert resp.status_code == 413
-
-
-def test_summary_rejects_malformed_answers(client):
-    resp = client.post("/api/interview/summary", data={"answers": "not json"})
-    assert resp.status_code == 400
-    resp = client.post("/api/interview/summary", data={"answers": '{"a": 1}'})
-    assert resp.status_code == 400
-
-
-def test_summary_ignores_non_object_entries(client, monkeypatch):
-    captured = {}
-
-    def fake_sum(ctx, qa):
-        captured["qa"] = qa
-        return {"level": "ok", "summary": "s", "strengths": [], "improvements": []}
-
-    monkeypatch.setattr(main.gemini_client, "summarize_interview", fake_sum)
-    resp = client.post(
-        "/api/interview/summary",
-        data={"answers": json.dumps(["junk", {"question": "q", "answer": "a"}])},
-    )
-    assert resp.status_code == 200
-    assert captured["qa"] == [{"question": "q", "answer": "a"}]
-
-
-def test_long_text_fields_are_truncated(client, monkeypatch):
-    captured = {}
-    monkeypatch.setattr(
-        main.gemini_client, "generate_prompt",
-        lambda c: captured.setdefault("ctx", c) or "p",
-    )
-    client.post("/api/prompt", data={"context": "a" * (main.MAX_TEXT_CHARS + 500)})
-    assert len(captured["ctx"]) == main.MAX_TEXT_CHARS
+def fake_planned(kind="behavioral"):
+    s = make_session(kind)
+    return {"kind": kind, "track": "swe", "level": "intern", "persona": s.persona, "interviewer_name": "Maya",
+            "seeds": ["x"], "seed_titles": ["X"], "minutes": s.minutes, "planner_model": "fake", "plan": make_plan(kind)}
+
+
+def test_meta(client):
+    r = client.get("/api/meta")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["budget"]["limit_usd"] > 0 and body["has_resume"] is False
+
+
+def test_cross_site_post_blocked(client):
+    r = client.post("/api/interviews", json={}, headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403
+
+
+def test_start_interview_returns_public_info_only(client, monkeypatch):
+    monkeypatch.setattr(planner, "build_plan", lambda *a, **k: fake_planned())
+    r = client.post("/api/interviews", json={"kind": "behavioral", "track": "swe", "level": "intern"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["interviewer_name"] == "Maya" and "plan" not in body and "questions" not in str(body)
+
+
+def test_start_interview_model_failure_is_readable(client, monkeypatch):
+    def boom(*a, **k):
+        raise models.ModelError("Every model failed for the interview plan (a: busy).")
+    monkeypatch.setattr(planner, "build_plan", boom)
+    r = client.post("/api/interviews", json={"kind": "coding", "track": "swe", "level": "intern"})
+    assert r.status_code == 503 and "busy" in r.json()["error"]
+
+
+def test_budget_guard_blocks_new_interviews(client, monkeypatch):
+    storage.record_spend(main.config.MONTHLY_BUDGET_USD + 1, "test")
+    called = []
+    monkeypatch.setattr(planner, "build_plan", lambda *a, **k: called.append(1))
+    r = client.post("/api/interviews", json={"kind": "coding", "track": "swe", "level": "intern"})
+    assert r.status_code == 402 and not called
+
+
+def test_resume_crud(client):
+    assert client.put("/api/resume", json={"text": "  "}).status_code == 400
+    assert client.put("/api/resume", json={"text": "x" * (main.MAX_RESUME_CHARS + 1)}).status_code == 413
+    assert client.put("/api/resume", json={"text": "My resume"}).json()["text"] == "My resume"
+    assert client.get("/api/meta").json()["has_resume"] is True
+    client.delete("/api/resume")
+    assert client.get("/api/resume").json()["text"] == ""
+
+
+def test_grade_flow_saves_scores_only(client, monkeypatch):
+    s = make_session("behavioral")
+    s.t0 = time.monotonic() - 120
+    s.log("interviewer", "Tell me about a conflict.")
+    s.log("candidate", "We disagreed about the database.")
+    s.state = "ended"
+    sessions.add(s)
+    seen = {}
+
+    def fake_grade(sess, final_work, progress):
+        seen["work"] = final_work
+        progress("grading")
+        return {"overall_score": 72, "categories": [{"id": "structure", "label": "S", "score": 70, "reason": "r"}],
+                "delivery": {"filler_score": 80}, "questions_for_them": {"score": 60}}
+
+    monkeypatch.setattr(grading, "grade", fake_grade)
+    r = client.post(f"/api/interviews/{s.id}/grade", data={"final_work": "def f(): pass"})
+    assert r.status_code == 200
+    for _ in range(50):
+        st = client.get(f"/api/interviews/{s.id}/grade").json()
+        if st.get("report"):
+            break
+        time.sleep(0.05)
+    assert st["report"]["overall_score"] == 72
+    assert seen["work"] == "def f(): pass"
+    saved = client.get("/api/history").json()["interviews"][0]
+    assert saved["scores"] == {"structure": 70, "fillers": 80, "questions": 60}
+    # A second grade request is refused while/after grading.
+    assert client.post(f"/api/interviews/{s.id}/grade").status_code == 409
+
+
+def test_grade_refused_before_interview_started(client):
+    s = make_session("coding")
+    s.state = "ended"
+    sessions.add(s)
+    r = client.post(f"/api/interviews/{s.id}/grade")
+    assert r.status_code == 400
+
+
+def test_grade_unknown_interview(client):
+    assert client.post("/api/interviews/nope/grade").status_code == 404
+
+
+# --- the turn-by-turn interview ----------------------------------------------
+import audio  # noqa: E402
+import interviewer  # noqa: E402
+
+
+def ready_session(kind="coding"):
+    s = make_session(kind)
+    sessions.add(s)
+    return s
+
+
+def test_begin_starts_clock_and_returns_opening(client):
+    s = ready_session()
+    r = client.post(f"/api/interviews/{s.id}/begin").json()
+    assert r["say"] == "Hi t" and s.state == "live" and s.t0 is not None
+    assert client.post(f"/api/interviews/{s.id}/begin").status_code == 409
+
+
+def test_spoken_turn_is_transcribed_logged_and_answered(client, monkeypatch):
+    s = ready_session()
+    client.post(f"/api/interviews/{s.id}/begin")
+    s.t0 -= 30  # the interview has been running for 30 s
+    monkeypatch.setattr(audio, "to_mp3", lambda raw: b"mp3:" + raw[:3])
+    monkeypatch.setattr(grading, "transcribe_turn", lambda mp3, meter: [
+        {"text": "Um,", "start": 0.1, "end": 0.3}, {"text": "hello.", "start": 0.4, "end": 0.8}])
+    seen = {}
+
+    def fake_respond(sess, answer_s=0.0, auto_stopped=False, event=""):
+        seen.update(answer_s=answer_s, auto_stopped=auto_stopped, work=sess.latest_work)
+        return {"say": "Tell me more.", "reveal": None, "ended": False}
+
+    monkeypatch.setattr(interviewer, "respond", fake_respond)
+    r = client.post(f"/api/interviews/{s.id}/turn",
+                    files={"answer": ("a.webm", b"x" * 2000, "audio/webm")},
+                    data={"started_at": "0.5", "duration": "12", "auto_stopped": "true", "work": "code"})
+    body = r.json()
+    assert body["heard"] == "Um, hello." and body["say"] == "Tell me more."
+    assert seen == {"answer_s": 12.0, "auto_stopped": True, "work": "code"}
+    assert [w["start"] for w in s.words] == [pytest.approx(0.6), pytest.approx(0.9)]  # on the interview clock
+    assert s.audio == [b"mp3:xxx"]
+
+
+def test_silent_turn_costs_no_model_call(client, monkeypatch):
+    s = ready_session()
+    client.post(f"/api/interviews/{s.id}/begin")
+    monkeypatch.setattr(audio, "to_mp3", lambda raw: b"mp3")
+    monkeypatch.setattr(grading, "transcribe_turn", lambda mp3, meter: [])
+    monkeypatch.setattr(interviewer, "respond", lambda *a, **k: pytest.fail("should not be called"))
+    body = client.post(f"/api/interviews/{s.id}/turn", files={"answer": ("a.webm", b"x" * 2000, "audio/webm")}).json()
+    assert body["say"] is None and "didn't hear" in body["message"]
+    tiny = client.post(f"/api/interviews/{s.id}/turn", files={"answer": ("a.webm", b"x", "audio/webm")}).json()
+    assert tiny["say"] is None
+
+
+def test_typed_turn_and_interviewer_ending(client, monkeypatch):
+    s = ready_session("behavioral")
+    client.post(f"/api/interviews/{s.id}/begin")
+    monkeypatch.setattr(interviewer, "respond",
+                        lambda sess, *a, **k: {"say": "Thanks, goodbye.", "reveal": None, "ended": True})
+    body = client.post(f"/api/interviews/{s.id}/turn", data={"text": "No more questions."}).json()
+    assert body["ended"] is True and s.state == "ended"
+    assert s.timeline[-1]["typed"] is True and s.timeline[-1]["text"] == "No more questions."
+    assert client.post(f"/api/interviews/{s.id}/turn", data={"text": "hi"}).status_code == 409
+
+
+def test_model_failure_offers_retry(client, monkeypatch):
+    s = ready_session("behavioral")
+    client.post(f"/api/interviews/{s.id}/begin")
+
+    def boom(*a, **k):
+        raise models.ModelError("Every model failed for the interviewer reply (x: busy).")
+
+    monkeypatch.setattr(interviewer, "respond", boom)
+    r = client.post(f"/api/interviews/{s.id}/turn", data={"text": "My answer"})
+    assert r.status_code == 503 and "Retry" in r.json()["error"]
+    assert s.timeline[-1]["text"] == "My answer" and s.busy is False
+    monkeypatch.setattr(interviewer, "respond", lambda sess, *a, **k: {"say": "Go on.", "reveal": None, "ended": False})
+    assert client.post(f"/api/interviews/{s.id}/retry").json()["say"] == "Go on."
+
+
+def test_end_marks_early_and_allows_grading(client, monkeypatch):
+    s = ready_session("behavioral")
+    client.post(f"/api/interviews/{s.id}/begin")
+    s.log("candidate", "an answer")
+    body = client.post(f"/api/interviews/{s.id}/end", data={"work": ""}).json()
+    assert body["ok"] and s.state == "ended" and s.ended_early
+    monkeypatch.setattr(grading, "grade", lambda sess, work, progress: {"overall_score": 50, "categories": []})
+    assert client.post(f"/api/interviews/{s.id}/grade").status_code == 200
