@@ -114,7 +114,8 @@ DELIVERY_PROMPT = (
     "range and don't cluster on multiples of 5. 'energy' and 'tone' are one or two "
     "sentences each. 'observations': 3-6 specific moments and what you noticed there; "
     "describe each moment by what they were saying (e.g. 'while explaining the cache'), "
-    "and set 'time' to an empty string, because this audio's clock doesn't match the interview's."
+    "and set 'time' to an empty string, because this audio's clock doesn't match the interview's. "
+    "Write everything in English only, with no words from any other language."
 )
 
 
@@ -124,7 +125,7 @@ def analyze_delivery(mp3: bytes, meter: CostMeter) -> dict:
         [types.Part.from_bytes(data=mp3, mime_type=audio.MP3_MIME), DELIVERY_PROMPT],
         DELIVERY_SCHEMA, timeout_s=config.DELIVERY_TIMEOUT_S, meter=meter, task="delivery analysis",
     )
-    return result.data
+    return models.scrub_non_english(result.data)
 
 
 # --- 2. Exact stats ---------------------------------------------------------
@@ -286,6 +287,8 @@ interview. Candidate level: {catalog.LEVELS[session.level]}, track: {catalog.TRA
 Calibrate to that level: an average real {catalog.LEVELS[session.level].lower()} candidate scores about 55-65,
 a clear hire 75+, exceptional 90+. Be honest and specific; this is for practice, so
 kind-but-direct beats flattering. {ended}
+Write every field in plain English only: no words or characters from any other
+language, and no HTML tags.
 
 Hints used (coding): {session.hints_used}. Each hint should lower "approach" a bit.
 
@@ -389,7 +392,10 @@ def grade(session, final_work: str, progress=lambda stage: None) -> dict:
         _grade_schema(session.kind), timeout_s=config.GRADER_TIMEOUT_S, meter=meter,
         thinking="medium", task="grading", validate=_validate_grade,
     )
-    g = result.data
+    # The prompt asks for English, but a stray code-switched word still slips
+    # through now and then. Removing it is free; rejecting the whole report
+    # would fall back to a weaker grader or pay for a second Argon call.
+    g = models.scrub_non_english(result.data)
 
     typed = " ".join(e["text"] for e in session.timeline if e["who"] == "candidate" and e.get("typed"))
     candidate_text = " ".join(w["text"] for w in words) + " " + typed

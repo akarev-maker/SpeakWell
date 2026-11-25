@@ -38,11 +38,8 @@ MAX_SAY_WORDS = 110
 # interview has passed; before that, the interviewer goes deeper instead.
 EARLIEST_FINAL_FRACTION = 0.6
 
-# Scripts we never want to hear from an English-speaking interviewer.
-_NON_ENGLISH = re.compile(
-    "[\u0400-\u052f\u0590-\u06ff\u0900-\u0dff\u0e00-\u0eff\u1100-\u11ff"
-    "\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]"
-)
+# Every interview kind starts with the 'intro' phase, so this fits them all.
+DEFAULT_FIRST_QUESTION = "To start, could you tell me a little about yourself?"
 
 
 def answer_limit(s: InterviewSession) -> int:
@@ -51,9 +48,17 @@ def answer_limit(s: InterviewSession) -> int:
 
 
 def opening(s: InterviewSession) -> str:
-    """The first thing the interviewer says, straight from the plan (free)."""
-    first = (s.phases[0].get("talking_points") or [""])[0]
-    text = f"{s.plan['opening'].strip()} {first.strip()}".strip()
+    """The first thing the interviewer says, straight from the plan (free).
+
+    Only the plan's "opening" is read aloud. Talking points are guidance for the
+    model and are sometimes written as instructions ("Listen warmly..."), so
+    reading one out verbatim leaked the plan.
+    """
+    text = models.scrub_non_english(s.plan["opening"].strip())
+    if "?" not in text:
+        if text and text[-1] not in ".!":
+            text += "."
+        text = f"{text} {DEFAULT_FIRST_QUESTION}".strip()
     return clean_say(text)
 
 
@@ -98,6 +103,8 @@ STYLE: {s.persona.style}
 
 HOW TO TALK
 - English only, always, even if the transcript contains other languages.
+- "say" is only words spoken to the candidate. Never read out the plan, its talking points,
+  or any instruction to yourself (e.g. "Listen warmly..."); act on them instead.
 - Spoken style: usually 1-3 sentences, one question at a time. No lists, no markdown, no emojis.
 - React to what they actually said: probe vague claims, ask "why", ask for specifics.
 - The candidate's lines are a verbatim speech transcript, so they include "um"s and false
@@ -234,7 +241,7 @@ def _validator(s: InterviewSession):
         say = str(d.get("say", "")).strip()
         if not say:
             raise models.ModelError("empty reply")
-        if _NON_ENGLISH.search(say):
+        if models.NON_ENGLISH.search(say):
             raise models.ModelError("reply was not in English")
         nxt = d.get("next_phase")
         if nxt not in ids:

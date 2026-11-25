@@ -60,6 +60,11 @@ def test_thinking_level_dropped_when_model_rejects_it(fake_gemini):
     assert c.models.calls == ["a", "a"]
 
 
+def test_scrub_non_english_cleans_nested_strings():
+    data = {"a": "explain具体的 availability", "b": ["ok", "нет"], "n": 3}
+    assert models.scrub_non_english(data) == {"a": "explain availability", "b": ["ok", ""], "n": 3}
+
+
 def test_parse_json_strips_fence():
     assert models.parse_json('```json\n{"a": 1}\n```') == {"a": 1}
     with pytest.raises(models.ModelError):

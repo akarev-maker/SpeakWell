@@ -77,7 +77,8 @@ def test_grade_uses_session_words_and_drops_fake_quotes(fake_gemini, monkeypatch
         "engagement": 70, "confidence": 66, "energy": "ok", "tone": "ok", "observations": []})
     graded = {
         "overall_score": 61, "verdict": "v",
-        "categories": [{"id": "structure", "score": 60, "reason": "r"}, {"id": "bogus", "score": 1, "reason": "x"}],
+        "categories": [{"id": "structure", "score": 60, "reason": "struggled to explain具体的 trade-offs"},
+                       {"id": "bogus", "score": 1, "reason": "x"}],
         "moments": [{"time": "00:10", "quote": "we disagreed about the database", "issue": "i", "better": "b", "type": "content"},
                     {"time": "00:20", "quote": "I invented Kubernetes", "issue": "i", "better": "b", "type": "content"}],
         "strengths": [], "improvements": [], "questions_for_them": {"score": 10, "feedback": "f"},
@@ -86,6 +87,7 @@ def test_grade_uses_session_words_and_drops_fake_quotes(fake_gemini, monkeypatch
     fake_gemini({"gemini-4-argon": [json.dumps(graded)]})
     rep = grading.grade(s, "")
     assert [c["id"] for c in rep["categories"]] == ["structure"]
+    assert rep["categories"][0]["reason"] == "struggled to explain trade-offs"
     assert [m["time"] for m in rep["moments"]] == ["00:10"]
     assert rep["delivery"]["filler_counts"] == {"um": 1}
     assert rep["delivery"]["engagement_score"] == 70

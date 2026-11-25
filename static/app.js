@@ -702,7 +702,8 @@ function referenceHtml(rep) {
       <p><b>Follow-up variants</b></p>${list(ref.follow_up_variants)}`;
   }
   if (rep.kind === "system_design" && ref.prompt) {
-    const facts = (ref.hidden_facts || []).map((f) => `<b>${esc(f.topic)}:</b> ${esc(f.answer)}`);
+    // Plain markdown: list() escapes each item, so HTML built here would show as literal tags.
+    const facts = (ref.hidden_facts || []).map((f) => `**${f.topic}:** ${f.answer}`);
     return `<p>${md(ref.prompt)}</p><p><b>Facts you could have asked for</b></p>${list(facts)}
       <p><b>A strong design covers</b></p>${list(ref.must_cover)}
       <p><b>Deep-dive topics</b></p>${list(ref.deep_dive_topics)}

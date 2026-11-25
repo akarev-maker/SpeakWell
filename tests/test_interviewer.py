@@ -209,6 +209,14 @@ def test_answer_limit_by_phase_and_persona():
     assert interviewer.answer_limit(live_session(phase="intro", persona="tough")) == round(150 * 0.75)
 
 
-def test_opening_comes_from_plan():
+def test_opening_reads_only_the_plan_opening():
     s = live_session()
-    assert interviewer.opening(s) == "Hi t"
+    s.plan["opening"] = "Hi, I'm Maya. Tell me about yourself?"
+    s.phases[0]["talking_points"] = ["Listen warmly to their introduction."]
+    assert interviewer.opening(s) == "Hi, I'm Maya. Tell me about yourself?"
+
+
+def test_opening_without_a_question_gets_one():
+    s = live_session()
+    s.plan["opening"] = "Hi, I'm Maya"
+    assert interviewer.opening(s) == f"Hi, I'm Maya. {interviewer.DEFAULT_FIRST_QUESTION}"

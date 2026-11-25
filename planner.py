@@ -173,7 +173,9 @@ The interview has these phases, in this order. Return exactly one entry in
 {phase_lines}
 
 For each phase: "goal" (what the interviewer is assessing), "talking_points"
-(what the interviewer says or asks, in order), "follow_ups" (probing questions
+(the questions or lines the interviewer says, in order, written as the exact
+words spoken to the candidate, never as directions to the interviewer such as
+"Listen warmly..." or "Acknowledge..."), "follow_ups" (probing questions
 to use depending on answers), "move_on_when" (a concrete condition for moving
 to the next phase).
 
@@ -185,8 +187,10 @@ specific to THIS interview's content:
 {rubric_lines}
 
 "opening": what the interviewer says first: greet, introduce themself by name
-and a plausible role, say how long the interview is and roughly how it will go.
-Two or three sentences. Do NOT say how many questions there are.
+and a plausible role, say how long the interview is and roughly how it will go,
+then end with the first question of the first phase. Three or four sentences,
+spoken directly to the candidate. Do NOT say how many questions there are.
+Write the whole plan in English only, with no words from any other language.
 """
     if kind == "coding":
         text += """

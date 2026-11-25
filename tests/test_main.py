@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import grading
+import interviewer
 import main
 import models
 import planner
@@ -126,7 +127,7 @@ def ready_session(kind="coding"):
 def test_begin_starts_clock_and_returns_opening(client):
     s = ready_session()
     r = client.post(f"/api/interviews/{s.id}/begin").json()
-    assert r["say"] == "Hi t" and s.state == "live" and s.t0 is not None
+    assert r["say"] == "Hi. " + interviewer.DEFAULT_FIRST_QUESTION and s.state == "live" and s.t0 is not None
     assert client.post(f"/api/interviews/{s.id}/begin").status_code == 409
 
 

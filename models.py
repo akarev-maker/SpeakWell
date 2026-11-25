@@ -8,6 +8,7 @@ immediately, because no other model will accept it either.
 import functools
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -22,6 +23,28 @@ log = logging.getLogger(__name__)
 
 class ModelError(RuntimeError):
     """A failure whose message is safe and useful to show the user."""
+
+
+# Scripts that never belong in SpeakWell's English output. Gemini sometimes
+# code-switches mid-sentence (e.g. a stray Chinese word in English feedback).
+NON_ENGLISH = re.compile(
+    "[\u0400-\u052f\u0590-\u06ff\u0900-\u0dff\u0e00-\u0eff\u1100-\u11ff"
+    "\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]+"
+)
+
+
+def scrub_non_english(value):
+    """Remove non-English script from every string in a JSON-like value."""
+    if isinstance(value, str):
+        if not NON_ENGLISH.search(value):
+            return value
+        log.warning("Removed non-English text from model output: %r", value[:200])
+        return re.sub(r" {2,}", " ", NON_ENGLISH.sub(" ", value)).strip()
+    if isinstance(value, list):
+        return [scrub_non_english(v) for v in value]
+    if isinstance(value, dict):
+        return {k: scrub_non_english(v) for k, v in value.items()}
+    return value
 
 
 @dataclass
